@@ -1,0 +1,9 @@
+---
+import PublicLayout from '../layouts/PublicLayout.astro';
+import { TermsHandbookPage } from '../components/TermsHandbookPage';
+---
+
+<!-- 中文注释：手册必须免登录可读；勿用带 SiteAuthGate 的 Layout -->
+<PublicLayout title="海螺节点项目许可与使用手册" description="Hailuo Node terms & usage handbook">
+  <TermsHandbookPage client:load />
+</PublicLayout>

@@ -1,0 +1,776 @@
+{
+  "description": "M9-24 Owner Gateway / Worker B compat 白名单 SSOT。`/api/friend-requests` 同时出现在 ownerRules 与 compatMountPrefixes 是有意设计：Owner Gateway 直发到 Worker A（owner-only 写）；Worker B compat 挂载同前缀是 M9-24 兼容路径占位（待 M9-25 站点彻底切走后移除）。",
+  "ownerRules": [
+    {
+      "match": "exact",
+      "path": "/auth/login-params",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/auth/login",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/auth/session/heartbeat",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/auth/logout",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/auth/me",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/auth/profile",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/auth/password-params",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/auth/change-password",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/auth/totp/",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/email-verify-request",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/email-verify-confirm",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/register",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/register/bootstrap-targets",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/register/intake",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/register/complete",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/register/append-complete",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/register/bootstrap-outbound-template",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/posts",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/feed",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry-official-feed-status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry-official-feed/pull",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry-daily-sync-status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry-daily-sync/run",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry-urgent-policies/status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry-urgent-policies/run",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/public-health-probe",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/registration-profile",
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/email-certify",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/cert-purge-status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/certification-context",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/cert-inbound-address",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/esp-verify-request",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/url-change/precheck",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/url-change/confirm",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/url-change/status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry/rotate-token",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/follows/pull-probe",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/online-status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/feed-aggregate/run",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/owner-sessions",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/local/owner-sessions/",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/registry-recommended-users",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/operation-logs",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/operation-logs/cleanup",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/notifications",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/notifications/mark-read",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/local/mutual-follows",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/interactions/sign-envelope",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/send-ticket",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/deliver",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/sign-envelope",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/outbox",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/dm/outbox/",
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/inbox",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/unread-count",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/dm/messages/",
+      "methods": [
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/dm/conversations/",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/wrapped-keys",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/wrapped-identity",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/owner/wrapped-vault",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/import-messages",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/dm/media/fetch-ticket",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/groups/media/fetch-ticket",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/messaging/cloud-capability",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/messaging/db-capacity",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/messaging/events",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/messaging/media/proxy",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/messaging/media",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/messaging/media/",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/me/dm-pubkey",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/private-notes",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/private-notes/export",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/private-notes/import",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/export",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/import",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/import/promote-staging",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/import-status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/hosted-l0/status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/hosted-l0/privacy",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/hosted-l0/privacy/accept",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node/account/delete",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/private-notes/attachments",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/private-notes/",
+      "methods": [
+        "GET",
+        "PUT",
+        "PATCH",
+        "DELETE"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node-settings/follower-token-mode",
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node-settings/friend-requests",
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/read/mutual-proof",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/node-settings/media-storage",
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/lookup/",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/friend-requests",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/friend-requests/",
+      "methods": [
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/follows",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/follows/",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/blacklist",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/blacklist/",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/posts",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/posts/repost",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/posts/",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/images",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/images/",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/groups",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "match": "exact",
+      "path": "/api/groups/local",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/groups/local/",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "match": "prefix",
+      "pathPrefix": "/api/groups/",
+      "methods": [
+        "POST",
+        "GET",
+        "PUT"
+      ]
+    }
+  ],
+  "publicWorkerBPrefixes": [
+    "/posts",
+    "/feed",
+    "/img/",
+    "/users/",
+    "/health",
+    "/.well-known/",
+    "/api/follower-tokens",
+    "/api/media/tickets",
+    "/interactions/",
+    "/dm/",
+    "/groups/"
+  ],
+  "compatMountPrefixes": [
+    "/auth/",
+    "/api/local/",
+    "/api/lookup/",
+    "/api/dm/",
+    "/api/me/dm-pubkey",
+    "/api/friend-requests",
+    "/api/follows",
+    "/api/blacklist",
+    "/api/posts",
+    "/api/images",
+    "/api/node-settings",
+    "/api/read",
+    "/api/messaging/"
+  ]
+}

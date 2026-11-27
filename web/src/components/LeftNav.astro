@@ -1,0 +1,120 @@
+---
+// M7-5b-1 左侧主导航（原 X 风格三栏左栏）。
+// M7-22：侧栏用户资料卡 + 注册入口 + 视觉美化
+// UX-APPLE-1：默认窄轨图标（~72px）
+// UX-APPLE-1b：lg+ 展开短文案（~200px），仍远小于旧 X 式 250px；手机/窄屏保持仅图标
+// M17-17：去掉独立「好友」入口（改消息页内通讯录 Tab）
+// UX-LEFTNAV-PROFILE-BOTTOM：把 OwnerNavProfile 从顶部移到左下角（推特样式）
+// UX-LEFTNAV-PROFILE-BOTTOM-FIX：①退出按钮回归到「设置」下方，不再被 mt-auto 强拉到底部；资料卡仍贴底。
+// UX-LEFTNAV-LOGO-RESTORE：恢复桌面端左栏顶部海螺（X 位）；手机端 hidden，避免与 NavBar 双图标。
+//   纠正 UX-LEFTNAV-MOBILE-LOGO-DEDUP 误伤：NavBar 是 md:hidden，删掉 LeftNav Logo 后桌面端品牌消失。
+import { House, Feather, UserRound, Users, NotebookPen, Settings } from 'lucide-preact';
+import { LogoutNavButton } from './LogoutNavButton';
+import { LeftNavRegisterLink } from './LeftNavRegisterLink';
+import { LeftNavNotificationLink } from './LeftNavNotificationLink';
+import { LeftNavMessageLink } from './LeftNavMessageLink';
+import { LeftNavGroupLink } from './LeftNavGroupLink';
+import { OwnerNavProfile } from './OwnerNavProfile';
+
+interface Props {
+  active?: 'home' | 'composer' | 'profile' | 'follows' | 'friends' | 'notes' | 'messages' | 'notifications' | 'groups' | 'settings' | 'register' | 'certify';
+}
+const { active } = Astro.props;
+
+type NavKey = NonNullable<Props['active']>;
+
+interface NavItem {
+  key: NavKey;
+  href: string;
+  label: string;
+  icon: typeof House;
+}
+
+const items: ReadonlyArray<NavItem> = [
+  { key: 'home', href: '/', label: '首页', icon: House },
+  { key: 'composer', href: '/composer', label: '发帖', icon: Feather },
+  { key: 'profile', href: '/profile', label: '个人主页', icon: UserRound },
+  { key: 'follows', href: '/follows', label: '关注', icon: Users },
+  { key: 'notes', href: '/notes', label: '记录', icon: NotebookPen },
+  { key: 'settings', href: '/settings', label: '设置', icon: Settings },
+];
+
+/** UX-APPLE-1b：窄轨居中；lg+ 左对齐并留出文案间距 */
+const navItemBase =
+  'flex items-center justify-center gap-0 rounded-2xl px-3 py-3 text-[18px] transition lg:justify-start lg:gap-3';
+const navLabelClass = 'hidden truncate text-[15px] font-medium lg:inline';
+
+/** 桌面端顶部海螺；手机端 hidden（NavBar 已有品牌） */
+const navLogoBase =
+  'hidden items-center justify-center rounded-2xl px-3 py-3 text-[18px] transition md:flex lg:justify-start';
+---
+
+<aside
+  class="sticky top-0 flex h-full w-[72px] shrink-0 flex-col gap-1 px-1.5 py-4 lg:w-[200px] lg:px-3"
+  aria-label="主导航"
+>
+  {/* UX-LEFTNAV-LOGO-RESTORE：md+ 显示海螺回首页；手机端隐藏，避免与 NavBar 双图标 */}
+  <a
+    href="/"
+    class={`${navLogoBase} ${active === 'home' ? 'text-sky-600 dark:text-sky-300' : 'text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-900'}`}
+    aria-label="海螺节点首页"
+    title="海螺节点首页"
+    data-i18n-attr="aria-label:siteHome"
+    data-astro-prefetch="false"
+  >
+    <img src="/favicon.svg" alt="" width={30} height={30} class="h-[30px] w-[30px]" />
+  </a>
+  <div class="hidden h-2 md:block" aria-hidden="true"></div>
+  {items.slice(0, 5).map((item) => {
+    const Icon = item.icon;
+    const isActive = active === item.key;
+    const cls = isActive
+      ? `${navItemBase} bg-sky-100 font-bold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200`
+      : `${navItemBase} font-normal text-zinc-800 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-50`;
+    return (
+      <a
+        href={item.href}
+        class={cls}
+        aria-label={item.label}
+        aria-current={isActive ? 'page' : undefined}
+        title={item.label}
+        data-astro-prefetch="false"
+      >
+        <Icon size={26} strokeWidth={isActive ? 2.5 : 2} class="shrink-0" aria-hidden="true" />
+        <span class={navLabelClass} data-i18n={`nav${item.key.charAt(0).toUpperCase()}${item.key.slice(1)}`}>{item.label}</span>
+      </a>
+    );
+  })}
+  <LeftNavRegisterLink client:idle active={active} />
+  <LeftNavMessageLink client:idle active={active === 'messages'} />
+  <LeftNavGroupLink client:idle active={active === 'groups'} />
+  <LeftNavNotificationLink client:idle active={active === 'notifications'} />
+  {items.slice(5).map((item) => {
+    const Icon = item.icon;
+    const isActive = active === item.key;
+    const cls = isActive
+      ? `${navItemBase} bg-sky-100 font-bold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200`
+      : `${navItemBase} font-normal text-zinc-800 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-50`;
+    return (
+      <a
+        href={item.href}
+        class={cls}
+        aria-label={item.label}
+        aria-current={isActive ? 'page' : undefined}
+        title={item.label}
+        data-astro-prefetch="false"
+      >
+        <Icon size={26} strokeWidth={isActive ? 2.5 : 2} class="shrink-0" aria-hidden="true" />
+        <span class={navLabelClass} data-i18n={`nav${item.key.charAt(0).toUpperCase()}${item.key.slice(1)}`}>{item.label}</span>
+      </a>
+    );
+  })}
+  {/* UX-LEFTNAV-PROFILE-BOTTOM-FIX：退出按钮回到「设置」下面（不再被 mt-auto 甩到最底部）。
+    X/Twitter 实际是「设置/更多/资料卡」同行——这里资料卡由 mt-auto 推到底部，
+    退出按钮保留在导航区末尾，符合「退出属系统操作」的语义分组。 */}
+  <LogoutNavButton client:idle />
+  {/* UX-LEFTNAV-PROFILE-BOTTOM：登录态下把资料卡贴底；未登录不渲染。Logout 在它上方。 */}
+  <div class="mt-auto">
+    <OwnerNavProfile client:idle />
+  </div>
+</aside>

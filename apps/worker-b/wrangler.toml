@@ -1,0 +1,142 @@
+# M8-0：站主生产部署模板（Deploy 按钮 / wrangler deploy --env production）
+#
+# - 部署顺序：先 Worker A，再 Worker B（production Service Binding 指向 A）。
+# - Worker A 不绑公网 Custom Domain；B 为唯一公开读入口（§F-02）。
+# - 无 D1、无 R2 硬绑（F-14）。
+# - SDH-2：B 与 A 必须共用同一 DEPLOY_GROUP_CODE（8226e6）与三套 KV id。
+
+name = "hailuo-worker-b-prod-placeholder"
+main = "src/index.ts"
+# EXP-COMPAT-1：与 registry-gateway 对齐（原 2024-09-23，差 >90 天）；flags 不变。
+compatibility_date = "2026-04-18"
+compatibility_flags = ["nodejs_compat"]
+# F-02 修订（2026-09-16）：Worker B 是公开读层，默认保留 *.workers.dev 入口；
+# 部署者配好自定义域后，可在 Cloudflare 控制台 Settings → Triggers → Compatibility flags
+# 取消「workers.dev URL」启用即可关停兜底。强制硬关会卡死未配自定义域的部署者。
+
+# ── 本地 wrangler dev ─────────────────────────────────────────────────────
+[[kv_namespaces]]
+binding = "POSTS_CACHE_KV"
+id = "local-dev-placeholder"
+
+[[kv_namespaces]]
+binding = "IMAGE_KV"
+id = "local-dev-placeholder"
+
+[[kv_namespaces]]
+binding = "STATE_KV"
+id = "local-dev-placeholder"
+
+[[services]]
+binding = "WORKER_A"
+service = "hailuo-worker-a-local-placeholder"
+
+[vars]
+# F-07：BOOTSTRAP_HANDLE 与 Worker A 同值；未登记前对外 @handle 安全占位（防 undefined）。
+# **禁止**写成真实生产 handle / 拿本值去注册中心登记；登记后以 D1/KV public:profile 为准。
+# 占位示例（本地）：usr_alice_placeholder
+BOOTSTRAP_HANDLE = "usr_alice_placeholder"
+ED25519_PUBLIC_KEY = "local-dev-placeholder"
+# SEC-AUDIT-ENFORCED-FORCE-1：读帖档程序恒强制 token-required，不读本变量
+OWNER_PROXY_MODE = "disabled"
+# ALL-AUDIT-Y-16：OpenTelemetry 总开关 —— 默认关闭（0 quota）
+OTEL_ENABLED = "false"
+# M13-16：分页 lazy KV put 默认关（翻页从 *:latest 内存切片）
+PUBLIC_PAGE_LAZY_KV_PUT = "false"
+# F-10：REGISTRY_URL / WORKER_A_ORIGIN 不再硬编码生产子域。
+# 本地 wrangler dev 请复制 .dev.vars.example 为 .dev.vars 后填值；
+# 生产由 ci-finalize-urls.mjs 走 wrangler secret put 注入（见 deploy.md §secret）。
+# 读取点统一用 `?? ''` / `?.` / `||` 兼容 undefined。
+
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "hailuo_otel_b_local"
+
+# ── 生产环境 ───────────────────────────────────────────────────────────────
+[env.production]
+# P1-4：`[env.production].name` 由 bootstrap Apply-DeployResourceNames 现场 patch 为真值；
+# git 中只保留 hailuo-worker-b-prod-placeholder 字面；deploy Phase 1.5 门禁会检测未 patch 的 placeholder 并报错退出。
+# 顶层 name 不动（wrangler dev 本地用，与生产 worker 拓扑无关联）。
+name = "hailuo-worker-b-prod-placeholder"
+
+[env.production.vars]
+# SEC-AUDIT-ENFORCED-FORCE-2：未配置默认 token-required；站主 Settings 可改档（含 public-read）
+# 可选 FOLLOWER_TOKEN_MODE 作无 D1 时的 env 回落；有 D1/KV 时以节点配置为准
+OWNER_PROXY_MODE = "disabled"
+# Pages 站点 / Owner Gateway（CORS 白名单 SSOT）
+WORKER_A_ORIGIN = "https://hailuo-web-prod-placeholder.pages.dev"
+# ↑ 部署占位；登记后对外 @handle 以 D1/KV 为准
+# REGISTRY_URL 仅通过 wrangler secret put 注入（见 bootstrap / put-worker-secrets.mjs）
+# F-08 / P1-3：BOOTSTRAP_HANDLE / ED25519_PUBLIC_KEY 由 ci-bootstrap-resources.mjs
+# 在 deploy 时与 Worker A 同源覆盖，禁止 commit 真值
+# （本地/预览分别用 usr_alice_placeholder / usr_bob_placeholder + preview-placeholder 占位）
+# F-07：usr_bootstrap_placeholder / deploy 注入的 hailuo_<派生> 均为占位 ≠ 最终登记 handle；禁止误登记抢名。
+BOOTSTRAP_HANDLE = "usr_bootstrap_placeholder"
+ED25519_PUBLIC_KEY = "auto-generated-at-deploy"
+# ALL-AUDIT-Y-16：OpenTelemetry 总开关 —— 默认关闭
+OTEL_ENABLED = "false"
+# M13-16：分页 lazy KV put 默认关
+PUBLIC_PAGE_LAZY_KV_PUT = "false"
+# WORKER_A_ORIGIN：通过 wrangler secret put 注入（见 deploy.md §secret）
+# 禁止在 wrangler.toml 硬编码生产子域（12-anti-deanonymization always-on）
+
+# M-WORKFLOW-AE-1：见 Worker A 同节注释——OTEL 关时一键部署会剥离，避免 10089
+[[env.production.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "hailuo_otel_b_prod"
+
+[[env.production.services]]
+binding = "WORKER_A"
+#-08-WN：Service Binding service 字段同样由 bootstrap Apply-DeployResourceNames 现场 patch 为真值；
+# git 中只保留 hailuo-worker-*-prod-placeholder 字面；deploy Phase 1.5 门禁会检测未 patch 的 placeholder 并报错退出。
+service = "hailuo-worker-a-prod-placeholder"
+
+# 与 Worker A 同字面占位；bootstrap / ci-bootstrap 按 binding 回填真 id（禁止 git 入库真 UUID）
+[[env.production.kv_namespaces]]
+binding = "POSTS_CACHE_KV"
+id = "POSTS_CACHE_KV-prod-placeholder"
+
+[[env.production.kv_namespaces]]
+binding = "IMAGE_KV"
+id = "IMAGE_KV-prod-placeholder"
+
+[[env.production.kv_namespaces]]
+binding = "STATE_KV"
+id = "STATE_KV-prod-placeholder"
+
+# ── 预览环境（维护者/CI 可选）────────────────────────────────────────────
+[env.preview]
+name = "hailuo-worker-b-preview"
+
+[env.preview.vars]
+BOOTSTRAP_HANDLE = "usr_bob_placeholder"
+ED25519_PUBLIC_KEY = "preview-placeholder"
+# SEC-AUDIT-ENFORCED-FORCE-1：读帖档程序恒强制 token-required
+OWNER_PROXY_MODE = "disabled"
+WORKER_A_ORIGIN = "http://localhost:4321"
+# ALL-AUDIT-Y-16：OpenTelemetry 总开关 —— 默认关闭
+OTEL_ENABLED = "false"
+# M13-16：分页 lazy KV put 默认关
+PUBLIC_PAGE_LAZY_KV_PUT = "false"
+
+[[env.preview.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "hailuo_otel_b_preview"
+
+[[env.preview.services]]
+binding = "WORKER_A"
+service = "hailuo-worker-a-preview"
+
+[[env.preview.kv_namespaces]]
+binding = "POSTS_CACHE_KV"
+id = "00000000000000000000000000000004"
+
+[[env.preview.kv_namespaces]]
+binding = "IMAGE_KV"
+id = "00000000000000000000000000000005"
+
+[[env.preview.kv_namespaces]]
+binding = "STATE_KV"
+id = "00000000000000000000000000000006"
+
+# Secrets：INTERNAL_FORWARD_SECRET（与 Worker A 同值，M6-0a 转发头验证）、REGISTRY_URL

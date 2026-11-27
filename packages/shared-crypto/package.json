@@ -1,0 +1,19 @@
+{
+  "name": "@hailuo/shared-crypto",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./ed25519": "./src/ed25519.ts",
+    "./jwt": "./src/jwt.ts",
+    "./hmac": "./src/hmac.ts",
+    "./fingerprint": "./src/fingerprint.ts",
+    "./did": "./src/did.ts",
+    "./password": "./src/password.ts"
+  },
+  "dependencies": {
+    "@hailuo/shared-types": "*",
+    "@hailuo/shared-utils": "*",
+    "@noble/hashes": "^1.8.0"
+  }
+}

@@ -1,0 +1,7 @@
+name = "hailuo-web-pages"
+compatibility_date = "2026-08-09"
+
+# Pages 项目配置（无需构建命令，静态上传 + Functions）
+# project_name 必须是占位：CI / deploy-pages-only / deploy:ci 一律用 --project-name 覆盖真名。
+# 裸跑 `wrangler pages deploy` 若读到仓库真名会串号到他人/旧节点项目；禁止把 hailuo-web-{6hex}-… 真值入库。
+pages = { project_name = "hailuo-web-prod-placeholder" }

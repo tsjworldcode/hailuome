@@ -1,0 +1,100 @@
+# 一次性 Ed25519 换钥（仅手动触发；输入 ROTATE 确认）
+#
+# 用途：修复 GitHub / Workers Builds 升级后“公钥正常但 Worker 私钥仍旧”的签名错配。
+# 私钥只在 runner 的 RUNNER_TEMP 中生成并 secret put，不打印、不进 artifact。
+# 换钥后还必须更新注册中心 users.pubkey（本 workflow 不持有注册中心管理凭证）。
+name: Rotate node Ed25519 key (one-off)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type ROTATE to confirm key rotation'
+        required: true
+        type: string
+      # 公开仓不再写死真实节点 handle：换钥时由操作者显式传入（D1 users.handle）
+      handle:
+        description: 'Node handle whose users.pubkey should be updated (e.g. hailuo_xxxxxxxxxx)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  rotate:
+    if: ${{ github.event.inputs.confirm == 'ROTATE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install (npm ci)
+        run: npm ci
+
+      - name: Download latest deploy artifact (patched toml + state)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=$(gh run list --workflow deploy.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+          echo "latest deploy run: $RUN_ID"
+          # 先下载到临时目录再覆盖：checkout 里已有同名 wrangler.toml，直接 -D . 会 file exists。
+          rm -rf .artifact-final
+          gh run download "$RUN_ID" -n ci-deploy-final -D .artifact-final
+          cp -f .artifact-final/apps/worker-a/wrangler.toml apps/worker-a/wrangler.toml
+          cp -f .artifact-final/apps/worker-b/wrangler.toml apps/worker-b/wrangler.toml
+          cp -f .artifact-final/scripts/.ci-deploy-state.json scripts/.ci-deploy-state.json
+          rm -rf .artifact-final
+
+      - name: Prepare new Ed25519 key + patch production public key
+        id: prepare
+        run: node scripts/rotate-ed25519-prepare.mjs
+
+      - name: Put Worker A ED25519_PRIVATE_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          cat "$RUNNER_TEMP/ed25519-private.txt" | npm exec -- wrangler@3.114.17 secret put ED25519_PRIVATE_KEY --env production --config apps/worker-a/wrangler.toml
+
+      - name: Deploy Worker A with new public key
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm exec -- wrangler@3.114.17 deploy --env production --config apps/worker-a/wrangler.toml
+
+      - name: Deploy Worker B with new public key
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm exec -- wrangler@3.114.17 deploy --env production --config apps/worker-b/wrangler.toml
+
+      - name: Update D1 users.pubkey
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NODE_HANDLE: ${{ github.event.inputs.handle }}
+        run: |
+          PUB=$(cat "$RUNNER_TEMP/ed25519-public-hex.txt")
+          # handle 走环境变量，避免把真实节点 handle 写进公开仓库
+          npm exec -- wrangler@3.114.17 d1 execute IDENTITY_DB --remote --env production --config apps/worker-a/wrangler.toml --command "UPDATE users SET pubkey = '$PUB' WHERE handle = '$NODE_HANDLE'"
+
+      - name: Verify D1 users.pubkey
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npm exec -- wrangler@3.114.17 d1 execute IDENTITY_DB --remote --env production --config apps/worker-a/wrangler.toml --json --command "SELECT handle, pubkey FROM users LIMIT 1"
+
+      - name: Sync STATE_KV public:profile pubkey
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/sync-public-profile-pubkey.mjs --state scripts/.ci-deploy-state.json
+
+      - name: Print new public key (safe)
+        run: |
+          echo "NEW_ED25519_PUBLIC_HEX=$(cat "$RUNNER_TEMP/ed25519-public-hex.txt")"
+          echo "NEW_ED25519_PUBLIC_B64=$(cat "$RUNNER_TEMP/ed25519-public-b64.txt")"

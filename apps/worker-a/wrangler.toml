@@ -1,0 +1,315 @@
+# M8-0：站主生产部署模板（Deploy 按钮 / wrangler deploy --env production）
+#
+# - 站主默认只部署 [env.production]；[env.preview] 仅供维护者/CI，站主可忽略。
+# - database_name / KV binding 名稳定不变；首次部署由 Cloudflare 或 bootstrap 回填 id。
+# - 升级 redeploy 只换代码 + 跑新增 migration，不删 D1/KV、不重置已填 id（见 docs/m8-部署计划报告.md）。
+# - 无 [[r2_buckets]]（F-14）：未绑卡账号可一键部署，图片走 IMAGE_KV。
+# - 新增 D1 database_name 命名约定（M-NAMING-D1-1）：`hailuo-node-db-${acc8}-${group}`；
+#   ${group} 取小写（如 `identity` / `messaging-shard-2`），与 binding 名 `{GROUP}_DB` 大写下划线对应。
+#   历史 `hailuo-node-messaging-*-prod-placeholder` 系列（含 MESSAGING_DB / MESSAGING_SHARD_1）已落地，**不 rename**。
+
+name = "hailuo-worker-a-prod-placeholder"
+main = "src/index.ts"
+# EXP-COMPAT-1：与 registry-gateway 对齐（原 2024-09-23，差 >90 天）；flags 不变。
+compatibility_date = "2026-04-18"
+# global_fetch_strictly_public：Cron 拉关注节点须 fetch 其它 Worker B 的 workers.dev；
+# 同账号默认同域 fetch 会触发 Cloudflare 1042（浏览器直访正常）。此 flag 走公网路由。
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+workers_dev = false
+
+# ── 本地 wrangler dev（无 --env）────────────────────────────────────────────
+# M-OPT-SPLIT / A7-DB-RETIRE：业务三库 + DB_IMPORT；已移除遗留 binding=DB。
+
+# M-OPT-SPLIT A-1：身份目录库（users / challenges / system_config / 节点凭证）
+[[d1_databases]]
+binding = "IDENTITY_DB"
+database_name = "node-db-identity"
+database_id = "local-dev-identity-placeholder"
+migrations_dir = "db/migrations-identity"
+
+# M-OPT-SPLIT A-1：治理/运营库（audit / 风控 / 黑名单 / 推荐治理 / follower_token_rate_buckets）
+[[d1_databases]]
+binding = "GOVERNANCE_DB"
+database_name = "node-db-governance"
+database_id = "local-dev-governance-placeholder"
+migrations_dir = "db/migrations-governance"
+
+# M-OPT-SPLIT A-1：官方内容库（official_posts 预留 + 节点内 user_public_profile）
+[[d1_databases]]
+binding = "CONTENT_DB"
+database_name = "node-db-content"
+database_id = "local-dev-content-placeholder"
+migrations_dir = "db/migrations-content"
+
+# M9-7-S2：搬家 staging（正规 import 只写此库；本地与主库同 migrations）
+[[d1_databases]]
+binding = "DB_IMPORT"
+database_name = "node-db-import"
+database_id = "local-dev-import-placeholder"
+migrations_dir = "db/migrations"
+
+[[d1_databases]]
+binding = "MESSAGING_DB"
+database_name = "messaging-db"
+database_id = "local-dev-placeholder"
+migrations_dir = "db/messaging-migrations"
+
+# M16-P：群消息 overflow 分片（运维显式启用；本地 dev 预置占位）
+[[d1_databases]]
+binding = "MESSAGING_SHARD_1"
+database_name = "messaging-shard-1"
+database_id = "local-dev-shard-placeholder"
+migrations_dir = "db/messaging-shard-migrations"
+
+[[kv_namespaces]]
+binding = "POSTS_CACHE_KV"
+id = "local-dev-placeholder"
+
+[[kv_namespaces]]
+binding = "IMAGE_KV"
+id = "local-dev-placeholder"
+
+[[kv_namespaces]]
+binding = "STATE_KV"
+id = "local-dev-placeholder"
+
+[triggers]
+# 单条 Cron + scheduled 内 minute % 5 分支（原 */5 任务），每节点仅占 1/5 账号槽位
+crons = ["* * * * *"]
+
+[vars]
+FEED_VIA_QUEUE = "false"
+# M34-2：站主 dormant 时关注流 Cron（skip|slow|normal）；默认 skip 省外部子请求
+OWNER_DORMANT_FEED_POLICY = "skip"
+# R-MSG-2e：紧急策略旁路开关。默认关闭；开启后每小时轮询 policy-digest，urgent 时补拉黑名单/官方公告。
+# 每节点每日 urgent 辅拉上限 24 次（防刷爆配额）。
+URGENT_POLICY_PULL_ENABLED = "false"
+# F-07：BOOTSTRAP_HANDLE 是未登记前对外 @handle 的安全占位（防「未登记 → undefined」）。
+# **禁止**写成真实生产 handle / 拿本值去注册中心登记抢名：
+# 1) 站主完成登记后，运行时对外 @handle 以 D1 users.handle + STATE_KV public:profile 为准（≠ 站主登录名）；
+# 2) git 内只许 usr_*_placeholder 命名空间；生产 deploy 时由 ci-bootstrap-resources.mjs 覆盖为 hailuo_<派生>，
+#    那仍是「部署占位」≠ 最终对外身份，登记完成前勿当真 handle 宣传或二次登记。
+# 占位示例（本地）：usr_alice_placeholder
+BOOTSTRAP_HANDLE = "usr_alice_placeholder"
+# F-04 + F-10 + F-11：REGISTRY_URL / WORKER_B_URL / WORKER_A_ORIGIN 都通过 .dev.vars（本地）
+# 或 wrangler secret put（生产，见 deploy.md §secret / bootstrap/put-worker-secrets.mjs）注入；
+# 本文件不出现任何生产 URL 字面量。读取点统一用 `?? ''` / `?.` / `||` 兜底。
+# M9-PH-TA-3：禁止 BACKUP_REGISTRY_URL / PEER_REGISTRY_URL 等 env 裸写备用中心；
+# 备用仅能经主中心签发的 add_registry directive 进入 registry_endpoints。
+# M7-24：本节点每日向注册中心 lookup 回源上限（cache 命中不计）
+REGISTRY_LOOKUP_DAY_LIMIT = "10"
+# M-OPT-8b：L2 互粉协助（海螺节点默认开；显式 false 关闭）
+LOOKUP_L2_MUTUAL_ASSIST_ENABLED = "true"
+# M-OPT-8c：L3 有限 FoF（海螺节点默认开；显式 false 关闭）
+LOOKUP_L3_FOF_ENABLED = "true"
+ED25519_PUBLIC_KEY = "local-dev-placeholder"
+# F-11：WORKER_A_ORIGIN 不再硬编码生产 Pages 子域。
+# 本地 wrangler dev 请用 .dev.vars 的 WORKER_A_DEV_ORIGIN（F-17 优先）或 WORKER_A_ORIGIN；
+# 生产由 ci-finalize-urls.mjs 走 wrangler secret put 注入（见 deploy.md §secret）。
+# 读取点 cors.ts 已用 `?.trim() || ''` 兼容 undefined。
+# F-17：本地 CORS 额外 Origin 只写在 .dev.vars 的 WORKER_A_DEV_ORIGIN，生产不设
+# M9-13：黑名单即时同步（默认开启）
+BLACKLIST_IMMEDIATE_SYNC = "true"
+# 联邦黑名单：生产默认 enforce（显式 false 才关）
+FEDERATION_BLACKLIST_ENFORCE = "true"
+# R-AUDIT-SEP-B2：每轮 KV put+delete 上限（冷启动分轮）
+BLACKLIST_KV_WRITE_BUDGET = "100"
+# ALL-AUDIT-Y-16（🟡 16-2）：OpenTelemetry 总开关 —— 默认 "false"（0 quota 风险）
+# 启用：设 "true" + 确认下方 ANALYTICS binding 已配；详见 docs/observability-plan.md §1.1
+OTEL_ENABLED = "false"
+
+# ALL-AUDIT-Y-16：Workers Analytics Engine（metric 出口）
+# OTEL_ENABLED=false 时业务代码不写 datapoint，binding 存在也不占 quota
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "hailuo_otel_local"
+
+# M7-30i-3：默认块占位，避免不带 --env production 时误连旧组码 Worker B
+[[services]]
+binding = "WORKER_B"
+service = "hailuo-worker-b-local-placeholder"
+
+# ── 生产环境（站主 Deploy 按钮 / npm run deploy -w @hailuo/worker-a）────────
+[env.production]
+# P1-4：`[env.production].name` 由 bootstrap Apply-DeployResourceNames 现场 patch 为真值；
+# git 中只保留 hailuo-worker-a-prod-placeholder 字面；deploy Phase 1.5 门禁会检测未 patch 的 placeholder 并报错退出。
+# 顶层 name 不动（wrangler dev 本地用，与生产 worker 拓扑无关联）。
+name = "hailuo-worker-a-prod-placeholder"
+
+[env.production.vars]
+FEED_VIA_QUEUE = "false"
+# Worker B 读帖 endpoint（同账号 Service Binding 已配，URL 仅用于跨账号/Cron 拉关注）
+# Pages 站点 / Owner Gateway（CORS 白名单 SSOT）
+REGISTRY_LOOKUP_DAY_LIMIT = "10"
+LOOKUP_L2_MUTUAL_ASSIST_ENABLED = "true"
+LOOKUP_L3_FOF_ENABLED = "true"
+# 登录排障：仅本地 .dev.vars 设 LOGIN_DIAG=true；生产禁止开启（SDH-1）
+LOGIN_DIAG = "false"
+# R-MSG-2e：紧急策略旁路默认关闭；生产由 operator 评估后开启
+URGENT_POLICY_PULL_ENABLED = "false"
+# M34-2：站主 dormant 时关注流 Cron（skip|slow|normal）；默认 skip 省外部子请求
+# （wrangler 4.x 顶层 [vars] 不继承到 env.production.vars，必须显式复刻一份）
+OWNER_DORMANT_FEED_POLICY = "skip"
+# ↑ 部署占位；登记后对外 @handle 以 D1 users.handle + STATE_KV public:profile 为准
+# REGISTRY_URL 仅通过 wrangler secret put 注入（见 bootstrap / put-worker-secrets.mjs）
+BLACKLIST_IMMEDIATE_SYNC = "true"
+# 联邦黑名单生产默认 enforce；紧急关闭设 "false"
+FEDERATION_BLACKLIST_ENFORCE = "true"
+BLACKLIST_KV_WRITE_BUDGET = "100"
+# F-04：WORKER_B_URL / WORKER_A_ORIGIN 仅通过 wrangler secret put 注入；本文件不出现任何生产子域字面量。
+# 同步 A=B 的 INTERNAL_FORWARD_SECRET 必须用 put-worker-secrets.mjs 一键回填（见 deploy.md §secret）。
+# F-08 / P1-3：BOOTSTRAP_HANDLE / ED25519_PUBLIC_KEY 由 scripts/ci-bootstrap-resources.mjs
+# 在 deploy 时从 ci-stable-identity.mjs 派生并 patchSimpleKey 覆盖，禁止 commit 真值
+# （本地/预览分别用 usr_alice_placeholder / usr_bob_placeholder + preview-placeholder 占位）
+# F-07：下方 usr_bootstrap_placeholder 是 git 安全占位；deploy 注入的 hailuo_<派生> 仍≠最终登记 handle。
+# **禁止**把本字段当「已登记身份」提交注册中心或写进公开文档。
+BOOTSTRAP_HANDLE = "usr_bootstrap_placeholder"
+ED25519_PUBLIC_KEY = "auto-generated-at-deploy"
+WORKER_B_URL = "https://hailuo-worker-b-prod-placeholder.workers.dev"
+WORKER_A_ORIGIN = "https://hailuo-web-prod-placeholder.pages.dev"
+# ALL-AUDIT-Y-16（🟡 16-2）：OpenTelemetry 总开关 —— 默认 "false"（0 quota 风险）
+# 启用方法：wrangler secret put OTEL_ENABLED = "true" + 加 [[analytics_engine_datasets]] binding
+# 详见 docs/observability-plan.md §1.1
+OTEL_ENABLED = "false"
+
+[[env.production.services]]
+binding = "WORKER_B"
+#-08-WN：Service Binding service 字段同样由 bootstrap Apply-DeployResourceNames 现场 patch 为真值；
+# git 中只保留 hailuo-worker-*-prod-placeholder 字面；deploy Phase 1.5 门禁会检测未 patch 的 placeholder 并报错退出；顶层 [[services]] 不动（已是 -local-placeholder）。
+service = "hailuo-worker-b-prod-placeholder"
+
+# A7-DB-RETIRE：已移除遗留 binding=DB。搬家 staging 见下方 DB_IMPORT（全表 migrations）。
+# P1-4：以下 database_id 为 git 安全占位（*-prod-placeholder）；bootstrap 时由 Set-TomlProductionD1ByBinding
+# 动态填入真实 id；Deploy 时 wrangler deploy --dry-run 门禁（Phase 1.5）会检测到 placeholder 并报错退出。
+# 冒烟：npm run smoke:m-opt-split-a7-bindings:remote
+[[env.production.d1_databases]]
+binding = "IDENTITY_DB"
+database_name = "hailuo-node-db-identity-prod-placeholder"
+database_id = "IDENTITY_DB-prod-placeholder"
+migrations_dir = "db/migrations-identity"
+
+[[env.production.d1_databases]]
+binding = "GOVERNANCE_DB"
+database_name = "hailuo-node-db-governance-prod-placeholder"
+database_id = "GOVERNANCE_DB-prod-placeholder"
+migrations_dir = "db/migrations-governance"
+
+[[env.production.d1_databases]]
+binding = "CONTENT_DB"
+database_name = "hailuo-node-db-content-prod-placeholder"
+database_id = "CONTENT_DB-prod-placeholder"
+migrations_dir = "db/migrations-content"
+
+# M9-7-S2：搬家 staging 库（与主库同组码）
+[[env.production.d1_databases]]
+binding = "DB_IMPORT"
+database_name = "hailuo-node-db-import-prod-placeholder"
+database_id = "DB_IMPORT-prod-placeholder"
+migrations_dir = "db/migrations"
+
+[[env.production.d1_databases]]
+binding = "MESSAGING_DB"
+database_name = "hailuo-node-messaging-db-prod-placeholder"
+database_id = "MESSAGING_DB-prod-placeholder"
+migrations_dir = "db/messaging-migrations"
+
+[[env.production.d1_databases]]
+binding = "MESSAGING_SHARD_1"
+database_name = "hailuo-node-messaging-shard-1-prod-placeholder"
+database_id = "MESSAGING_SHARD_1-prod-placeholder"
+migrations_dir = "db/messaging-shard-migrations"
+
+[[env.production.kv_namespaces]]
+binding = "POSTS_CACHE_KV"
+id = "POSTS_CACHE_KV-prod-placeholder"
+
+[[env.production.kv_namespaces]]
+binding = "IMAGE_KV"
+id = "IMAGE_KV-prod-placeholder"
+
+[[env.production.kv_namespaces]]
+binding = "STATE_KV"
+id = "STATE_KV-prod-placeholder"
+
+# ALL-AUDIT-Y-16 / M-WORKFLOW-AE-1：生产 Analytics Engine
+# 注意：账号未开通 AE 时，即便 OTEL_ENABLED=false，带此 binding 的 deploy 也会报 10089。
+# 一键部署（ci-bootstrap / bootstrap-hailuo-cloudflare.ps1）在 OTEL 关时会现场剥离本块；
+# 仅 OTEL_ENABLED=true 时保留。git 保留模板供本地/启用观测时参考。
+[[env.production.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "hailuo_otel_prod"
+
+# ── 预览环境（维护者/CI 可选；站主 production-only 策略下可跳过）────────────
+[env.preview]
+name = "hailuo-worker-a-preview"
+
+[env.preview.vars]
+FEED_VIA_QUEUE = "false"
+BOOTSTRAP_HANDLE = "usr_bob_placeholder"
+WORKER_B_URL = "https://changeme-preview.workers.dev"
+ED25519_PUBLIC_KEY = "preview-placeholder"
+WORKER_A_ORIGIN = "https://changeme-preview.pages.dev"
+LOOKUP_L2_MUTUAL_ASSIST_ENABLED = "true"
+LOOKUP_L3_FOF_ENABLED = "true"
+BLACKLIST_IMMEDIATE_SYNC = "true"
+FEDERATION_BLACKLIST_ENFORCE = "true"
+BLACKLIST_KV_WRITE_BUDGET = "100"
+# R-MSG-2e：紧急策略旁路默认关闭
+URGENT_POLICY_PULL_ENABLED = "false"
+# ALL-AUDIT-Y-16：OpenTelemetry 总开关 —— 默认关闭
+OTEL_ENABLED = "false"
+
+# ALL-AUDIT-Y-16：preview Analytics Engine
+[[env.preview.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "hailuo_otel_preview"
+
+# A7-DB-RETIRE：preview 亦无 binding=DB。
+[[env.preview.d1_databases]]
+binding = "IDENTITY_DB"
+database_name = "node-db-preview-identity"
+database_id = "00000000-0000-0000-0000-00000000b101"
+migrations_dir = "db/migrations-identity"
+
+# M-OPT-SPLIT A-1：治理/运营库（预览；占位 id）
+[[env.preview.d1_databases]]
+binding = "GOVERNANCE_DB"
+database_name = "node-db-preview-governance"
+database_id = "00000000-0000-0000-0000-00000000b102"
+migrations_dir = "db/migrations-governance"
+
+# M-OPT-SPLIT A-1：官方内容库（预览；占位 id）
+[[env.preview.d1_databases]]
+binding = "CONTENT_DB"
+database_name = "node-db-preview-content"
+database_id = "00000000-0000-0000-0000-00000000b103"
+migrations_dir = "db/migrations-content"
+
+[[env.preview.d1_databases]]
+binding = "DB_IMPORT"
+database_name = "node-db-import-preview"
+database_id = "00000000-0000-0000-0000-0000000000a2"
+migrations_dir = "db/migrations"
+
+[[env.preview.d1_databases]]
+binding = "MESSAGING_DB"
+database_name = "node-messaging-db-preview"
+database_id = "00000000-0000-0000-0000-000000000004"
+migrations_dir = "db/messaging-migrations"
+
+[[env.preview.kv_namespaces]]
+binding = "POSTS_CACHE_KV"
+id = "00000000000000000000000000000004"
+
+[[env.preview.kv_namespaces]]
+binding = "IMAGE_KV"
+id = "00000000000000000000000000000005"
+
+[[env.preview.kv_namespaces]]
+binding = "STATE_KV"
+id = "00000000000000000000000000000006"
+
+# ── Secrets（禁止写入本文件，用 .dev.vars.example / wrangler secret put）────
+# JWT_SECRET / ED25519_PRIVATE_KEY / HMAC_SECRET / INTERNAL_FORWARD_SECRET / REGISTRY_URL
+# INTERNAL_FORWARD_SECRET 必须与同节点 Worker B 相同（M6-0a Service Binding 转发头）
+# OWNER-KEY-1：GROUP_OWNER_KEY_WRAP_SECRET（仅 A；包裹 group_owner_epoch_keys；勿与其它 secret 复用）

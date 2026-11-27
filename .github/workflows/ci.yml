@@ -1,0 +1,66 @@
+# 仓库自检：push / PR 上跑「不访问 Cloudflare」的部署契约门禁。
+#
+# 与 deploy.yml 分工：
+#   deploy.yml  → workflow_dispatch 手动部署（会写站主自己的 Cloudflare 账号）
+#   ci.yml      → push / pull_request 自动报警（只读仓库文件，零云端调用）
+#
+# 本工作流不接任何 Cloudflare 凭证：门禁全是静态扫描 + 本地 dry-run，
+# 所以可以直接跑 fork / 外部 PR，不会泄露 Token，也不会误写线上资源。
+#
+# 跑什么（package.json 同名脚本，本地可先自查）：
+#   npm run test:deploy-github-actions      GitHub Actions 部署契约
+#   npm run test:deploy-workers-builds     Workers Builds（deploy:ci）契约
+#   npm run test:deploy-config-consistency wrangler 占位 / 组码一致性（洁净仓）
+#   npm run audit:deploy-shell-hazards     部署 shell/YAML 同类坑审计
+#
+# 说明：四条门禁只用 Node 内置模块，不装依赖（无 npm ci）；
+# 若以后门禁引入第三方依赖，再补 Setup Node 缓存 + npm ci。
+
+name: CI checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # PR 连续推送时取消旧 run；分支内保持并发独立
+  group: hailuo-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-contract:
+    name: 🧪 部署契约门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '20'
+
+    - name: GitHub Actions 部署契约
+      run: npm run test:deploy-github-actions
+
+    - name: Workers Builds 部署契约
+      # 公开仓不发布该门禁脚本；私有仓仍保留，补齐 D1/KV 后照常跑
+      if: ${{ hashFiles('scripts/test-deploy-workers-builds.mjs') != '' }}
+      run: npm run test:deploy-workers-builds
+
+    - name: Ed25519 密钥对门禁
+      run: npm run test:ed25519-key-consistency
+
+    # 洁净仓断言：wrangler.toml 必须是 *-prod-placeholder、A/B 组码一致
+    - name: 部署配置一致性（洁净仓）
+      run: npm run test:deploy-config-consistency
+
+    - name: 部署 shell/YAML 坑审计
+      run: npm run audit:deploy-shell-hazards

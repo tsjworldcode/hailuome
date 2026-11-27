@@ -1,0 +1,25 @@
+/** M-REFACTOR-1g：legacy facade — 全仓 import `../lib/i18n` 保持可用 */
+export {
+  DEFAULT_LANGUAGE,
+  LANGUAGE_CODES,
+  LANGUAGE_STORAGE_KEY,
+  SUPPORTED_LOCALES,
+  TRANSLATIONS,
+  language,
+  normalizeLanguage,
+  isLanguage,
+  matchBrowserLanguage,
+  htmlLangFor,
+  turnstileLangFor,
+  getBrowserDefaultLanguage,
+  readStoredLanguage,
+  translate,
+  t,
+  setLanguage,
+  initLanguage,
+  loadLocale,
+  preloadLocale,
+  isLocaleLoaded,
+  getCatalog,
+} from './i18n/index';
+export type { Language, TranslationKey, MessageCatalog } from './i18n/index';

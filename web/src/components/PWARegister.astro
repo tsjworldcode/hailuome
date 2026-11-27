@@ -1,0 +1,27 @@
+---
+// M7-6 PWA 注册：在 <head> 末尾以 is:inline 同步插入一段最小注册代码。
+//
+// 设计要点：
+//   - 仅生产构建（import.meta.env.PROD）才注册，dev 模式跳过避免 SW 干扰热重载
+//   - 注册路径固定 /sw.js（与 web/public/sw.js 直接发布到根的约定一致）
+//   - scope='/' 让 SW 接管整站；失败静默 console.warn，不阻塞页面渲染
+//   - 不写 navigator.serviceWorker 任何持久监听以保最小闭环；后续 M7-7 / M9+ 可扩展
+//
+// §F-02 红线：本组件零业务私密写层 URL / 零 Worker A 客户端引入；
+// 唯一外部交互是 navigator.serviceWorker.register(/sw.js)。
+const isProd = import.meta.env.PROD;
+---
+
+{isProd && (
+  <script is:inline>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker
+          .register('/sw.js', { scope: '/' })
+          .catch((err) => {
+            console.warn('[hailuo] SW 注册失败：', err);
+          });
+      });
+    }
+  </script>
+)}

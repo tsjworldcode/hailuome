@@ -1,0 +1,22 @@
+# Astro
+dist/
+.astro/
+
+# Environments
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.DS_Store
+
+# Generated
+*.tsbuildinfo
+public/deploy-env.json
+public/site-version.json
+# M9-AUDIT-3：构建生成，禁止把本地空配置当源码提交
+functions/_worker-b-config.js

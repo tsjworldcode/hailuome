@@ -1,0 +1,79 @@
+---
+// M7-5b-0：主题初始化（无 FOUC）；M7-5b-6 扩展支持 'system' 三态。
+//
+// 作用：在 <head> 内同步执行（is:inline），读 localStorage `hailuo:theme`
+// 决定是否给 <html> 加 `dark` class，避免浏览器先以浅色渲染一帧再翻深色
+// 造成的闪屏。Tailwind darkMode='class' 模式下此脚本是必需的。
+//
+// 合法值：'light' | 'dark' | 'system'（M7-5b-6 ThemeToggle 写入）
+//   - 'light' / 'dark'：显式选择
+//   - 'system'：跟随浏览器 prefers-color-scheme
+//   - 其他（含 null）：默认跟随系统（首访登录页和内部页都贴合系统主题）
+//
+// 注意：脚本必须用 is:inline 让 Astro 不打包，否则会移到页面末尾，FOUC 闪屏窗口会变大。
+---
+
+<script is:inline>
+  (function () {
+    function readThemeChoice() {
+      try {
+        var stored = localStorage.getItem('hailuo:theme');
+        if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+      } catch (_e) {
+        return 'system';
+      }
+      return 'system';
+    }
+
+    function resolveTheme(choice) {
+      if (choice === 'light' || choice === 'dark') return choice;
+      try {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } catch (_e) {
+        return 'dark';
+      }
+    }
+
+    function applyThemeToRoot(root, choice) {
+      var theme = resolveTheme(choice || readThemeChoice());
+      if (theme === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      root.dataset.theme = theme;
+    }
+
+    function applyTheme() {
+      applyThemeToRoot(document.documentElement, readThemeChoice());
+    }
+
+    try {
+      applyTheme();
+
+      // Astro ViewTransitions 会交换新 document；换页前先把新 <html> 写成用户保存的主题，避免导航后闪回默认主题。
+      document.addEventListener('astro:before-swap', function (event) {
+        if (event.newDocument) applyThemeToRoot(event.newDocument.documentElement, readThemeChoice());
+      });
+      document.addEventListener('astro:after-swap', applyTheme);
+      document.addEventListener('astro:page-load', applyTheme);
+      window.addEventListener('storage', function (event) {
+        if (event.key === 'hailuo:theme') applyTheme();
+      });
+
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', function () {
+        if (readThemeChoice() === 'system') applyTheme();
+      });
+    } catch (_e) {
+      // 极端兜底：主题初始化异常时仍尽量读取系统主题，避免首访固定深色。
+      var fallbackTheme = resolveTheme('system');
+      if (fallbackTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      document.documentElement.dataset.theme = fallbackTheme;
+    }
+  })();
+</script>

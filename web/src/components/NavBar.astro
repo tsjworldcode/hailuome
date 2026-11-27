@@ -1,0 +1,27 @@
+---
+// M7-3 顶部轻量导航栏（纯 Astro 模板，不水合，零 JS 开销）。
+//
+// M7-26e：移动端仅保留品牌 logo + 退出，主导航由 MobileBottomNav 承担，避免顶底双 6 项拥挤。
+//
+// M7-5b-0 升级：dark: 变体 + sticky 半透顶栏
+// M7-5b-1：md:hidden 仅 sm- 显示；md+ 由 LeftNav 承载
+import { MobileLogoutButton } from './MobileLogoutButton';
+---
+
+<nav
+  class="sticky top-0 z-20 border-b border-zinc-200/80 bg-white/80 backdrop-blur md:hidden dark:border-zinc-800/80 dark:bg-zinc-950/80"
+  aria-label="移动端顶栏"
+>
+  <div class="mx-auto flex h-14 max-w-2xl items-center justify-between gap-2 px-3 sm:px-6">
+    <a
+      href="/"
+      class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-900 transition hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800"
+      aria-label="海螺节点首页"
+      data-i18n-attr="aria-label:siteHome"
+      data-astro-prefetch="false"
+    >
+      <img src="/favicon.svg" alt="" class="h-8 w-8" loading="eager" />
+    </a>
+    <MobileLogoutButton client:idle variant="top" />
+  </div>
+</nav>

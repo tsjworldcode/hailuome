@@ -1,0 +1,15 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "baseUrl": ".",
+    "paths": {
+      "@hailuo/shared-types": ["../packages/shared-types/src/index.ts"],
+      "@hailuo/shared-utils": ["../packages/shared-utils/src/index.ts"],
+      "@hailuo/shared-crypto": ["../packages/shared-crypto/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.astro", "src/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", ".astro"]
+}

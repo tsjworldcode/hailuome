@@ -1,0 +1,40 @@
+---
+/**
+ * 公开页布局（无需站主登录）。
+ * 用于 /terms 等合规文档：不挂 SiteAuthGate，避免点手册链被拦回登录页。
+ */
+import ThemeScript from '../components/ThemeScript.astro';
+import LanguageScript from '../components/LanguageScript.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = '海螺节点',
+  description = '海螺节点 — 去中心化社交节点',
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#3b5bdb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0c0a09" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <ThemeScript />
+    <LanguageScript />
+  </head>
+  <body class="min-h-[100dvh] bg-white text-zinc-900 antialiased touch-manipulation dark:bg-black dark:text-zinc-50">
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+</style>

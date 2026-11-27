@@ -1,0 +1,43 @@
+{
+  "name": "@hailuo/worker-b",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.toml --port 8788",
+    "build": "tsc --noEmit",
+    "deploy": "wrangler deploy --env production --config wrangler.toml",
+    "deploy:preview": "wrangler deploy --env preview --config wrangler.toml",
+    "typecheck": "npm run build"
+  },
+  "dependencies": {
+    "@hailuo/otel": "*",
+    "@hailuo/shared-crypto": "*",
+    "@hailuo/shared-types": "*",
+    "@hailuo/shared-utils": "*",
+    "hono": "^4.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240523.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.57.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "INTERNAL_FORWARD_SECRET": {
+        "description": "与 Worker A **相同**的转发密钥。Worker B 经 Service Binding 调 A 时携带 `X-Internal-Forward`"
+      },
+      "BOOTSTRAP_HANDLE": {
+        "description": "与 Worker A 相同的部署占位 handle；登记后以 D1/KV 公开资料为准"
+      },
+      "ED25519_PUBLIC_KEY": {
+        "description": "与 Worker A 相同的 Ed25519 公钥 hex（`npm run keys:generate`）"
+      },
+      "FOLLOWER_TOKEN_MODE": {
+        "description": "默认 `public-read`；Web 稳定后可在控制台改为 `enforced`"
+      },
+      "WORKER_A_ORIGIN": {
+        "description": "站主 Web 前端 Origin；enforced 模式下 Worker B CORS 只放行这一来源"
+      }
+    }
+  }
+}

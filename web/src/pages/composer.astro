@@ -1,0 +1,22 @@
+---
+// M7-3：发帖器
+// - 整页只挂一个 Preact island（client:load）；frontmatter 不做任何 fetch
+//   （Worker A 地址 / JWT / 图片上传全部走客户端运行时，避免 SSG 阶段把任何凭证落进静态产物）
+// - §F-02：本文件不引用任何 Worker A 字面量；Composer 组件内部用 auth.ts.getWorkerAUrl 运行时读取
+import Layout from '../layouts/Layout.astro';
+import { Composer } from '../components/Composer.tsx';
+---
+
+<Layout title="海螺节点 — 发帖" description="海螺节点 — 发布新帖子（文字 + 图片）" navActive="composer">
+  <div class="mx-auto w-full max-w-timeline">
+    <header class="sticky top-0 z-20 border-b border-[#eff3f4] bg-white/90 px-4 py-3 backdrop-blur-md dark:border-[#2f3336] dark:bg-black/90 sm:px-6">
+      <h1 class="text-xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50" data-i18n="composerPageTitle">发布新帖</h1>
+      <p class="mt-0.5 text-[13px] text-zinc-500 dark:text-zinc-400" data-i18n="composerPageDescription">
+        文字最多 500 字，图片最多 9 张，单张不超过 25 MB。
+      </p>
+    </header>
+    <div class="px-4 sm:px-6">
+      <Composer client:only="preact" />
+    </div>
+  </div>
+</Layout>

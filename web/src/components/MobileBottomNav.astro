@@ -1,0 +1,62 @@
+---
+// M7-5b-7 移动端底部 Tab Bar（X / Twitter / Instagram 移动版同源思路）。
+// M17-17：删独立「好友」；补「消息」（原底栏无消息入口，删好友后必须加）
+import { House, Feather, UserRound, Users, NotebookPen, Settings, MessagesSquare, MessageCircle } from 'lucide-preact';
+import { MobileLogoutButton } from './MobileLogoutButton';
+
+interface Props {
+  active?: 'home' | 'composer' | 'profile' | 'follows' | 'friends' | 'notes' | 'messages' | 'notifications' | 'groups' | 'settings' | 'register' | 'certify';
+}
+const { active } = Astro.props;
+
+type NavKey = NonNullable<Props['active']>;
+
+interface NavItem {
+  key: NavKey;
+  href: string;
+  label: string;
+  icon: typeof House;
+}
+
+const items: ReadonlyArray<NavItem> = [
+  { key: 'home', href: '/', label: '首页', icon: House },
+  { key: 'composer', href: '/composer', label: '发帖', icon: Feather },
+  { key: 'profile', href: '/profile', label: '个人主页', icon: UserRound },
+  { key: 'follows', href: '/follows', label: '关注', icon: Users },
+  { key: 'messages', href: '/messages', label: '消息', icon: MessageCircle },
+  { key: 'groups', href: '/groups/', label: '群聊', icon: MessagesSquare },
+  { key: 'notes', href: '/notes', label: '记录', icon: NotebookPen },
+  { key: 'settings', href: '/settings', label: '设置', icon: Settings },
+];
+---
+
+<nav
+  class="fixed bottom-0 inset-x-0 z-30 flex h-14 items-stretch justify-around border-t border-zinc-200/80 bg-white/95 backdrop-blur md:hidden dark:border-zinc-800/80 dark:bg-zinc-950/95"
+  style="padding-bottom: env(safe-area-inset-bottom)"
+  aria-label="移动端底部导航"
+  data-i18n-attr="aria-label:mobileNav"
+>
+  {items.map((item) => {
+    const Icon = item.icon;
+    const isActive = active === item.key;
+    const baseCls =
+      'flex flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[10px] transition';
+    const cls = isActive
+      ? `${baseCls} font-semibold text-sky-600 dark:text-sky-400`
+      : `${baseCls} font-normal text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50`;
+    return (
+      <a
+        href={item.href}
+        class={cls}
+        aria-current={isActive ? 'page' : undefined}
+        aria-label={item.label}
+        data-astro-prefetch="false"
+        data-i18n-attr={`aria-label:nav${item.key.charAt(0).toUpperCase()}${item.key.slice(1)}`}
+      >
+        <Icon size={22} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
+        <span data-i18n={`nav${item.key.charAt(0).toUpperCase()}${item.key.slice(1)}`}>{item.label}</span>
+      </a>
+    );
+  })}
+  <MobileLogoutButton client:idle variant="bottom" />
+</nav>

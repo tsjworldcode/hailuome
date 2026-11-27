@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Messages } from '../components/Messages.tsx';
+---
+
+<Layout
+  title="海螺节点 — 消息"
+  description="海螺节点 — 互粉私信（端到端加密）"
+  navActive="messages"
+  hideRightRail
+>
+  <Messages client:load />
+</Layout>

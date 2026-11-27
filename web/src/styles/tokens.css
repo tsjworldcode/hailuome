@@ -1,0 +1,70 @@
+/* UX-AUDIT-1：设计 token 入仓（web/src/styles/tokens.css）
+ *
+ * 背景：
+ * - UX-APPLE-2 起全仓走 zinc/sky/rose 等 Tailwind 系统色；某些字面量（如
+ *   `text-zinc-500/70` / `text-zinc-500 dark:text-zinc-500`）在深色背景上对比度
+ *   实测 < 4.5:1，未达 WCAG AA（正文）。
+ * - 本文件落地语义层（fg-1 主文 / fg-2 次文 / fg-3 辅助）三档色彩 + bg / accent /
+ *   status / border / radius / tap-target 系列 token，Tailwind 颜色 token 通过
+ *   `rgb(var(--xxx) / <alpha-value>)` 形式引用。
+ *
+ * 不变量（UX-AUDIT-1 §C7/C8）：
+ * - **不**在本文件落地前出现 `bg-zinc-50` / `text-zinc-500/70` 等已不达 AA 字面量
+ *   之外引入新数值色；后续动 git diff 在 <script>/<style>/<div> 中直接写 zinc/R/G/B
+ *   数值视同回退，须改读 token。
+ *
+ * 反追查：
+ * - 本文件零真实域名 / 真实色值生产基址；命名纯语义。
+ */
+:root {
+  /* 三档前景文字色：fg-1 主文（≥13:1）/ fg-2 次文（≥7:1）/ fg-3 辅助（≥4.5:1）
+   * RGB 三元组形式（用空格分隔）方便 Tailwind `rgb(var(--xxx) / <alpha-value>)` 拼装
+   * 与 CSS `rgb(var(--xxx))` 直读。 */
+  --fg-1: 24 24 27;        /* zinc-900 */
+  --fg-2: 82 82 91;        /* zinc-600 */
+  --fg-3: 113 113 122;     /* zinc-500 */
+
+  /* 三档背景色：bg-1 主背景 / bg-2 分组卡 / bg-3 嵌套卡 */
+  --bg-1: 255 255 255;     /* white */
+  --bg-2: 250 250 250;     /* zinc-50 */
+  --bg-3: 244 244 245;     /* zinc-100 */
+
+  /* 强调色（链接、选中态、active button 等） */
+  --accent: 14 165 233;    /* sky-500 */
+  --accent-bg: 224 242 254;/* sky-100 */
+
+  /* 状态色 */
+  --danger: 244 63 94;     /* rose-500 */
+  --success: 16 185 129;   /* emerald-500 */
+  --warning: 245 158 11;   /* amber-500 */
+
+  /* 分隔线 */
+  --border-1: 228 228 231; /* zinc-200（主分隔） */
+  --border-2: 212 212 216; /* zinc-300（强分隔） */
+
+  /* 圆角 */
+  --radius-card: 1rem;
+  --radius-button: 0.75rem;
+  --radius-pill: 9999px;
+
+  /* 触控目标最小尺寸（44×44px，与 iOS / WCAG 2.5.5 一致） */
+  --tap-target-min: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg-1: 250 250 250;   /* zinc-50 */
+    --fg-2: 212 212 216;   /* zinc-300 */
+    --fg-3: 161 161 170;   /* zinc-400 */
+
+    --bg-1: 9 9 11;        /* zinc-950 */
+    --bg-2: 24 24 27;      /* zinc-900 */
+    --bg-3: 39 39 42;      /* zinc-800 */
+
+    --accent: 56 189 248;  /* sky-400 */
+    --accent-bg: 12 74 110;/* sky-900 */
+
+    --border-1: 39 39 42;  /* zinc-800 */
+    --border-2: 63 63 70;  /* zinc-700 */
+  }
+}

@@ -1,0 +1,161 @@
+---
+// 基础布局壳，所有页面统一通过本布局接入 Tailwind 全局样式。
+// M7-0 立架；M7-2 Feed 接入；M7-3 起在所有页面顶部挂统一导航栏（NavBar.astro），
+// 各页通过 navActive prop 告诉导航当前是哪一页。
+// M7-4 扩展为五项：首页 / 发帖 / 个人页 / 关注 / 设置。
+// M7-6 PWA 落地时本布局会接 manifest / SEO meta。
+//
+// M7-5b-0：设计基线升级
+//   - <head> 顶部挂 ThemeScript（is:inline，无 FOUC 切深色）
+//   - body 改走 dark: 变体（浅色 zinc-50/zinc-900；深色 zinc-950/zinc-50）
+//   - body 使用 min-h-[100dvh] / h-[100dvh]（M7-26b 移动地址栏友好）
+//
+// UX-APPLE-1：窄轨 + 居中单栏（取代 M7-5b-1 / UX-NAV-3 的 X 式三栏总宽）
+//   - LeftNav：默认 72px 图标轨；UX-APPLE-1b 起 lg+ 展开 ~200px 短文案（非 250px X 侧栏）
+//   - main：默认 max-w-content（680px）居中；hideRightRail（消息/群聊）时铺满侧栏右侧剩余宽度（不 mx-auto）
+//   - RightRail 仅 xl+ 显示（搜索/推荐）；群聊等继续 hideRightRail
+//   - 中栏不加左右竖线（栏间靠留白）
+//
+// UX-CHAT-FLUSH-1：消息/群聊桌面端曾用 max-w-3xl + mx-auto，宽屏会在侧栏与内容卡之间留出大块空白；
+//   hideRightRail 改为 max-w-none 左贴侧栏，手机窄屏本就几乎满宽故观感不变。
+//
+// UX-CHAT-ALIGN-1：消息/群聊已贴左，但与首页时间线视觉上不"对齐"——main 内层 Messages 自身又包了
+//   p-3 md:p-4 + rounded-2xl 卡片壳，导致实际内容左缘比首页 PostCard 左缘多一层内边距。
+//   修正：把 Messages / GroupsChat 顶层去掉多余 padding，让 main 的 px-4 sm:px-6 与首页同源；
+//   子容器保留 roundex-2xl 边框以维持「单框」视觉，但左缘齐 Posts 列表行。
+//   认证页同样在 Layout 直接子元素上使用 px-4 sm:px-6，不再外加 max-w-lg + mx-auto（已是左贴）。
+//
+// UX-CHAT-ALIGN-2：站主三轮反馈「认证/私信/群组」与首页时间线左缘距侧栏距离不一致。
+//   根因：hideRightRail → max-w-none 让 main 贴 LeftNav 铺满剩余宽度，与首页 70px 居中留白不同。
+//   修正：
+//   - main 始终 mx-auto max-w-content（680px 居中），**所有页面主栏左缘到 LeftNav 右缘距离都是 70px**；
+//   - hideRightRail 时在 RightRail 槽位渲染 260px 占位（xl+ 显形，仅占位不渲染内容），让 1280px+ 屏三栏
+//     总宽=1140px 与首页一致；<1280px 屏占位隐藏，main 仍居中（<1280 屏 RightRail 本就不显示，主栏居中合理）；
+//   - <1280px 时 hideRightRail 仍走 max-w-none（手机/平板小屏不显示 RightRail / 占位时 main 贴满剩余）。
+//   - 站主期望的「首页时间线左侧距离侧栏的距离」= LeftNav 200 + 70(留白) + 16/24(px) = 286/294px；所有页统一。
+//
+// UX-NAV-3：主导航改由常显 LeftNav 承担，不再贴底 MobileBottomNav
+//
+// M7-6：PWA 最小闭环
+//   - <head> 加 link rel=manifest + theme-color + apple-touch-icon
+//   - <head> 末尾挂 PWARegister.astro（is:inline），仅生产构建注册 /sw.js
+//   - SW 文件 · manifest · 图标 · offline fallback 页均放 public/，随 Astro 静态产物发布
+//
+// M7-13（F-13 修复）：顶层接入 ToastContainer
+//   - body 末尾挂 client:idle 的 ToastContainer
+//   - 订阅 lib/toast.ts 顶层 toasts signal，IDB QuotaExceeded 等写错路径可全局推 toast
+//   - fixed bottom + z-50 与任何页布局互不干扰
+import NavBar from '../components/NavBar.astro';
+import LeftNav from '../components/LeftNav.astro';
+import RightRail from '../components/RightRail.astro';
+import ThemeScript from '../components/ThemeScript.astro';
+import LanguageScript from '../components/LanguageScript.astro';
+import PWARegister from '../components/PWARegister.astro';
+import { ToastContainer } from '../components/ToastContainer';
+import { SwCacheQuotaListener } from '../components/SwCacheQuotaListener';
+import { SiteAuthGate } from '../components/SiteAuthGate';
+import { ViewTransitions } from 'astro:transitions';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** 当前激活的导航项；不传则不高亮任一项（导航仍渲染） */
+  navActive?: 'home' | 'composer' | 'profile' | 'follows' | 'friends' | 'notes' | 'messages' | 'notifications' | 'groups' | 'settings' | 'register' | 'certify';
+  /** M16-4 / UX-CHAT-FLUSH-1：群聊/私信隐藏站点 RightRail；main 铺满侧栏右侧剩余宽度 */
+  hideRightRail?: boolean;
+  /**
+   * M7-26h-fix2：设置页等需要「左栏钉住、右栏自滚」时关掉 main 自身滚动，
+   * 否则绝对定位/ sticky 高度链一断，整页（含分组栏）仍跟着 main 滚走。
+   */
+  lockMainScroll?: boolean;
+}
+
+const {
+  title = '海螺节点',
+  description = '海螺节点 — 去中心化社交节点',
+  navActive,
+  hideRightRail = false,
+  lockMainScroll = false,
+} = Astro.props;
+
+/** 构建时注入，写入 HTML 内联脚本供客户端同步读取（避免等 fetch / getMe） */
+const deployWorkerB = (import.meta.env.PUBLIC_WORKER_B_URL ?? '').trim().replace(/\/+$/, '');
+const deployRegistry = (import.meta.env.PUBLIC_REGISTRY_URL ?? '').trim().replace(/\/+$/, '');
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#3b5bdb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0c0a09" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>{title}</title>
+    {(deployWorkerB || deployRegistry) && (
+      <script
+        is:inline
+        define:vars={{ deployWorkerB, deployRegistry }}
+      >
+        window.__HAILUO_DEPLOY__ = {
+          worker_b_url: deployWorkerB || undefined,
+          registry_url: deployRegistry || undefined,
+        };
+      </script>
+    )}
+    <ThemeScript />
+    <LanguageScript />
+    <ViewTransitions />
+    <PWARegister />
+  </head>
+  <body class="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-white text-zinc-900 antialiased touch-manipulation dark:bg-black dark:text-zinc-50">
+    <SiteAuthGate client:load>
+      <NavBar active={navActive} />
+      {/* UX-APPLE-1：去掉 X 式超宽总骨架；窄轨 + 居中主栏。
+          max-w-[1280px] 兜底：xl+ 三栏 LeftNav(200)+main(680)+RightRail(260)=1140px，
+          留 1280px 有余地；防止超宽屏把三栏拉太散（不设时三栏可撑满全屏）。
+          UX-CHAT-ALIGN-2：所有页主栏统一居中（70px 留白对齐首页），hideRightRail 在
+          xl+ 渲染 260px 隐形占位（仅占宽度不显内容），保证三栏总宽一致。 */}
+      <div class="mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 overflow-hidden">
+        <LeftNav active={navActive} />
+        <main
+          transition:name="main-content"
+          transition:animate="fade"
+          class:list={[
+            'hailuo-main-scroll relative flex min-h-0 w-full flex-1 flex-col bg-white dark:bg-black',
+            lockMainScroll ? 'overflow-hidden' : 'overflow-y-auto',
+            // UX-CHAT-ALIGN-2：main 始终 mx-auto max-w-content（680px 居中），
+            //   所有页主栏左缘到 LeftNav 右缘距离 = 70px 居中留白。
+            //   <1280px 屏 hideRightRail 时 main 改 max-w-none 贴满侧栏右侧（手机/平板合理）。
+            'mx-auto max-w-content',
+            hideRightRail ? 'xl:max-w-content max-w-none' : '',
+          ]}
+        >
+          {/* UX-CHAT-ALIGN-1：消息/群聊已在 main 内自管 p-3 md:p-4（与首页时间线 12/16px 左缘对齐），
+              不再外加 main 级的 px-4 sm:px-6。其它页（首页/设置等）保持 main 自身无水平 padding，
+              由各页/PostCard 自管。 */}
+          <slot />
+        </main>
+        {!hideRightRail ? (
+          <RightRail />
+        ) : (
+          // UX-CHAT-ALIGN-2：消息/群聊/认证/注册在 xl+ 仍占 260px 槽位，让主栏保持居中
+          //  (LeftNav 200 + 留白 70 + main 680 + 留白 70 + 占位 260 = 1280)，与首页三栏同源。
+          //  窄屏 (<xl) 占位隐藏，main 自身走 max-w-none 铺满（手机/平板合理）。
+          <div class="hidden xl:block w-[260px] shrink-0" aria-hidden="true" />
+        )}
+      </div>
+    </SiteAuthGate>
+    {/* M7-13 F-13：顶层 toast 容器；lib/toast.ts 推 toast 后本块自动重渲染 */}
+    <ToastContainer client:idle />
+    {/* M7-32b：SW 离线缓存 Quota 满 → postMessage → toast */}
+    <SwCacheQuotaListener client:idle />
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+</style>

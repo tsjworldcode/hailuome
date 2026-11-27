@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="海螺">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b5bdb" />
+      <stop offset="100%" stop-color="#2f4ac9" />
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="240" fill="url(#g)" />
+  <path d="M200 128C296 128 352 184 352 264C352 344 296 384 240 384C184 384 160 352 160 312C160 272 184 256 208 256C232 256 244 274.4 244 292" fill="none" stroke="#fff" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c0a09" />
+    <title>离线 · 海螺节点</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root {
+        color-scheme: dark light;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          'Helvetica Neue',
+          'PingFang SC',
+          'Hiragino Sans GB',
+          'Microsoft YaHei UI',
+          'Microsoft YaHei',
+          'Noto Sans SC',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        letter-spacing: -0.011em;
+        background: #09090b;
+        color: #fafafa;
+      }
+      main {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        gap: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+      }
+      p {
+        margin: 0;
+        color: #a1a1aa;
+        font-size: 14px;
+        line-height: 1.6;
+        max-width: 32em;
+      }
+      button {
+        margin-top: 16px;
+        padding: 10px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #fafafa;
+        background: #0284c7;
+        border: 0;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      button:hover {
+        background: #0369a1;
+      }
+      .icon {
+        width: 64px;
+        height: 64px;
+        opacity: 0.6;
+      }
+      @media (prefers-color-scheme: light) {
+        body {
+          background: #fafafa;
+          color: #18181b;
+        }
+        p {
+          color: #71717a;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="1" y1="1" x2="23" y2="23" />
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+        <line x1="12" y1="20" x2="12.01" y2="20" />
+      </svg>
+      <h1>离线了</h1>
+      <p>当前没有网络连接，无法刷新最新内容。已缓存的页面可以继续浏览；恢复联网后点下方按钮重试。</p>
+      <button type="button" onclick="window.location.reload()">重新加载</button>
+    </main>
+  </body>
+</html>

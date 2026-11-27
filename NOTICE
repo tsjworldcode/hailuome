@@ -1,0 +1,31 @@
+Hailuo Node（海螺节点）
+Copyright (C) 2026 Hailuo Project Copyright Holder（海螺项目版权方）
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+Additional terms / 附加说明
+----------------------------
+
+1. Commercial licensing is available for uses that cannot comply with
+   AGPL-3.0 (for example, a closed-source hosted service).
+   See COMMERCIAL_LICENSE.md.
+   无法满足 AGPL-3.0 的场景（例如闭源托管服务）可另行取得商业授权，
+   见 COMMERCIAL_LICENSE.md。
+
+2. If you run a modified version as a network service, AGPL-3.0 section 13
+   requires you to offer all users of that service the corresponding source.
+   如果你把修改版作为网络服务提供，AGPL-3.0 第 13 条要求你向该服务的
+   所有用户提供对应的完整源码。
+
+Source code / 源码：
+https://github.com/tsjworldcode/hailuome

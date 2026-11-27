@@ -1,0 +1,25 @@
+---
+// M7-7d：本地书签页（脱网渲染）
+//
+// 设计要点：
+// - 整页只挂一个 Preact island（client:load）；frontmatter 不做任何 fetch
+//   （所有数据从浏览器端 IndexedDB `hailuo` 数据库 `bookmarks` store 取，
+//   配合 M7-7b 写入时附带的 `snapshot` 字段（content / image_keys / author_handle），
+//   实现「断网也可阅读」的离线书签视图）
+// - 不传 navActive：本页是 Settings 「本地数据」的下钻入口，不占用 LeftNav / NavBar /
+//   MobileBottomNav 既有五项 enum（home/composer/profile/follows/settings），
+//   保持 M7-5b-* 所有断言零破坏；用户处于本页时左栏不高亮任一项
+// - §F-02：本文件不引用任何 Worker A 字面量；BookmarksList 内部仅走 lib/localDb，
+//   零 import.meta.env / 零 storage 直调 / 零 worker-a 字面量
+import Layout from '../layouts/Layout.astro';
+import { BookmarksList } from '../components/BookmarksList.tsx';
+---
+
+<Layout
+  title="海螺节点 — 我的书签"
+  description="海螺节点 — 本地书签离线渲染（全部从浏览器 IndexedDB 读取）"
+>
+  <div class="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+    <BookmarksList client:load />
+  </div>
+</Layout>

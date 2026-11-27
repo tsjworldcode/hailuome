@@ -1,0 +1,60 @@
+{
+  "name": "@hailuo/worker-a",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.toml",
+    "build": "tsc --noEmit",
+    "deploy": "npm run migrate:production && wrangler deploy --env production --config wrangler.toml",
+    "deploy:preview": "wrangler deploy --env preview --config wrangler.toml",
+    "typecheck": "npm run build",
+    "migrate:local": "node scripts/migrate-local.mjs",
+    "migrate:preview": "node scripts/migrate-local.mjs --remote --env preview",
+    "migrate:production": "node scripts/migrate-local.mjs --remote --env production",
+    "seed:default-owner:local": "node scripts/seed-default-owner.mjs --local --if-empty --yes",
+    "seed:default-owner:production": "node scripts/seed-default-owner.mjs --production --if-empty --yes"
+  },
+  "dependencies": {
+    "@hailuo/otel": "*",
+    "@hailuo/registry-protocol": "*",
+    "@hailuo/shared-crypto": "*",
+    "@hailuo/shared-types": "*",
+    "@hailuo/shared-utils": "*",
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240523.0",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.57.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "JWT_SECRET": {
+        "description": "站主 Web 登录 JWT 签名密钥。生成：`openssl rand -hex 32`"
+      },
+      "ED25519_PRIVATE_KEY": {
+        "description": "粉丝 Token 签发私钥（hex）。运行仓库根 `npm run keys:generate` 获取；公钥写入 wrangler `[env.production.vars].ED25519_PUBLIC_KEY`"
+      },
+      "HMAC_SECRET": {
+        "description": "（可选，注册联调时）与注册中心 operator 注入的 HMAC 密钥相同；首次部署可后补"
+      },
+      "INTERNAL_FORWARD_SECRET": {
+        "description": "Worker B → A Service Binding 转发头 `X-Internal-Forward` 共享密钥。**必须与 Worker B 相同**。生成：`openssl rand -hex 32`"
+      },
+      "GROUP_OWNER_KEY_WRAP_SECRET": {
+        "description": "OWNER-KEY：包裹 group_owner_epoch_keys.key_material（AES-GCM）。≥32 字节随机 hex。禁止与 JWT/HMAC/INTERNAL_FORWARD/TOTP/NODE_API_TOKEN wrap 复用。生成：`openssl rand -hex 32`"
+      },
+      "BOOTSTRAP_HANDLE": {
+        "description": "部署占位 handle（bootstrap 自动生成 hailuo_ 加 10 位后缀）。登记注册中心后以 D1 users.handle 为准；≠ 站主登录名"
+      },
+      "WORKER_B_URL": {
+        "description": "Worker B 公网 https 地址。Worker B 部署完成后回填"
+      },
+      "WORKER_A_ORIGIN": {
+        "description": "Pages Web 站点 Origin（CORS）。Pages 部署完成后回填"
+      }
+    }
+  }
+}

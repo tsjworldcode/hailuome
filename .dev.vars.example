@@ -1,0 +1,12 @@
+# 海螺节点 — 本地 Secret 入口说明（本文件不含真实密钥，勿提交 .dev.vars）
+#
+# 占位示例，禁止使用真实人名/手柄（12-anti-deanonymization）。
+# BOOTSTRAP_HANDLE 推荐：usr_alice_placeholder（见 apps/worker-a|b/wrangler.toml [vars]）
+#
+# Secret 按 Worker 分目录存放，Deploy 向导读取的是各 app 下 package.json 的 cloudflare.bindings 说明：
+#
+#   apps/worker-a/.dev.vars.example  → 复制为 apps/worker-a/.dev.vars
+#   apps/worker-b/.dev.vars.example  → 复制为 apps/worker-b/.dev.vars
+#   web/.env.example                 → 复制为 web/.env.local（仅本地；Pages 用控制台环境变量）
+#
+# 站主生产部署：见 docs/部署指南.md

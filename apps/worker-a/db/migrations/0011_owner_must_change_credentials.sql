@@ -1,0 +1,3 @@
+-- M8-7：首次部署默认站主凭证（admin/admin）须改密标志位。
+-- 键 owner_must_change_credentials：缺省或 'false' 表示不必强制改密；'true' 由 seed-default-owner.mjs 写入。
+-- 不在此 migration 预置行，避免 seed 无法将标志升为 'true'。

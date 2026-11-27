@@ -1,0 +1,48 @@
+# 一次性：把 Worker A 当前公钥同步到 STATE_KV public:profile
+#
+# 用途：换钥后 Worker B /users/:handle 仍返回旧快照公钥，导致外部节点验签失败。
+# 本 workflow 只读 Worker A 线上 ED25519_PUBLIC_KEY，patch KV 快照，不轮换密钥。
+name: Sync public profile pubkey (one-off)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type SYNC to confirm KV profile sync'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sync:
+    if: ${{ github.event.inputs.confirm == 'SYNC' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Download latest deploy artifact (state only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=$(gh run list --workflow deploy.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+          echo "latest deploy run: $RUN_ID"
+          rm -rf .artifact-final
+          gh run download "$RUN_ID" -n ci-deploy-final -D .artifact-final
+          mkdir -p scripts
+          cp -f .artifact-final/scripts/.ci-deploy-state.json scripts/.ci-deploy-state.json
+          rm -rf .artifact-final
+
+      - name: Sync STATE_KV public:profile pubkey
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/sync-public-profile-pubkey.mjs --state scripts/.ci-deploy-state.json

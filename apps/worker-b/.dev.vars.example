@@ -1,0 +1,27 @@
+# Worker B 本地 Secret 示例
+# 复制为同目录 .dev.vars（已被 .gitignore），勿提交 git。
+#
+# 占位示例，禁止使用真实人名/手柄（12-anti-deanonymization）。
+# BOOTSTRAP_HANDLE 与 A 同值，写在 wrangler.toml [vars]，推荐 usr_alice_placeholder /
+# usr_bob_placeholder（preview）；勿用 alice / bob_hailuo 等真实感示例。
+#
+# Deploy 向导说明见 package.json → cloudflare.bindings
+# 站主部署：docs/部署指南.md（须先完成 Worker A）
+
+# 与 Worker A .dev.vars 中 INTERNAL_FORWARD_SECRET 必须完全相同
+INTERNAL_FORWARD_SECRET=dev-internal-forward-secret-change-me
+
+# 以下写在 wrangler.toml [env.production.vars]（非 Secret），与 A 保持一致：
+#   BOOTSTRAP_HANDLE、ED25519_PUBLIC_KEY
+# 读帖档 SEC-AUDIT-ENFORCED-FORCE-1 程序恒强制 following-only，勿再配 FOLLOWER_TOKEN_MODE
+
+# F-10：本地 wrangler dev 用（与 wrangler.toml 顶层 [vars] 对应；顶层已删除生产子域硬编码）
+# 这两个变量按 .dev.vars → env 注入；缺失时 lib/publicPostMap.ts 的 resolveRegistryUrl() 会
+# 回落 DEFAULT_REGISTRY_URL（CORS 白名单则跳过 fallback，需 WORKER_A_ORIGIN 显式提供）。
+REGISTRY_URL=http://127.0.0.1:8789
+WORKER_A_ORIGIN=http://127.0.0.1:4321
+
+# SEC-6-AUTO 媒体票据：保护档自动开 / 公开读自动关；只须配独立密钥一次
+# 禁止复用 INTERNAL_FORWARD_SECRET / JWT_SECRET / HMAC_SECRET
+# MEDIA_TICKET_SECRET=dev-media-ticket-secret-change-me-unique
+# 紧急关闸（可选）：MEDIA_TICKET_ENABLED=false

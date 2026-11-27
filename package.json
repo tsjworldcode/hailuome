@@ -1,0 +1,41 @@
+{
+    "name": "hailuo-node-cf",
+    "version": "0.1.0",
+    "private": true,
+    "license": "AGPL-3.0-only",
+    "workspaces": [
+        "apps/worker-a",
+        "apps/worker-b",
+        "web",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev:worker-a": "npm run dev --workspace=apps/worker-a",
+        "dev:worker-b": "npm run dev --workspace=apps/worker-b",
+        "dev:web": "npm run dev --workspace=web",
+        "typecheck": "npm run typecheck --workspaces --if-present",
+        "typecheck:worker-a": "npm run typecheck --workspace=apps/worker-a",
+        "typecheck:worker-b": "npm run typecheck --workspace=apps/worker-b",
+        "build:worker-a": "npm run build --workspace=@hailuo/worker-a",
+        "build:worker-b": "npm run build --workspace=@hailuo/worker-b",
+        "build:workers": "npm run build:worker-a && npm run build:worker-b",
+        "deploy:ci": "node scripts/ci-deploy-all.mjs",
+        "deploy:worker-a": "npm run deploy --workspace=@hailuo/worker-a",
+        "deploy:worker-b": "npm run deploy --workspace=@hailuo/worker-b",
+        "deploy:web": "npm run deploy --workspace=web",
+        "deploy:all": "node scripts/deploy-all.mjs",
+        "keys:generate": "node scripts/generate-keys.mjs",
+        "secrets:deploy": "node scripts/generate-deploy-secrets.mjs",
+        "restore:wrangler-placeholders": "node scripts/restore-wrangler-placeholders.mjs",
+        "check:wrangler-placeholders": "node scripts/restore-wrangler-placeholders.mjs --check",
+        "test:deploy-github-actions": "node scripts/test-deploy-github-actions.mjs",
+        "test:deploy-config-consistency": "node scripts/test-deploy-config-consistency.mjs",
+        "test:deploy-config-consistency:post-patch": "node scripts/test-deploy-config-consistency.mjs --mode=post-patch",
+        "test:ed25519-key-consistency": "node scripts/test-ed25519-key-consistency.mjs",
+        "audit:deploy-shell-hazards": "node scripts/audit-deploy-shell-hazards.mjs",
+        "test:migration-coverage": "node scripts/check-migration-coverage.mjs"
+    },
+    "devDependencies": {
+        "tsx": "^4.23.15"
+    }
+}

@@ -1,0 +1,157 @@
+/* UX-AUDIT-1：设计 token 入仓入口
+ * 在所有 Tailwind layer 之前导入，使 base / components / utilities 都能消费
+ * CSS 自定义属性。
+ */
+@import './tokens.css';
+
+/* M7-0：全局样式入口
+ * Tailwind 三层指令（base / components / utilities）必须按此顺序声明，
+ * @astrojs/tailwind 已禁用默认注入（applyBaseStyles: false），由本文件完全掌控。
+ *
+ * M7-5b-0：设计基线
+ *   - html 声明 color-scheme，浏览器原生滚动条 / 表单控件随主题切换
+ *   - 默认字体接 Tailwind 扩展的 font-sans
+ *   - body 不再 hard code 颜色，由 Layout.astro 通过 dark: 变体直接写在 class 上
+ *
+ * UX-APPLE-2：系统 UI 字体栈优先（无默认 Inter / fontsource 加载）；
+ *   抗锯齿 + 略收紧字距保留；正文字号约 16px；标题字重约 600。
+ *
+ * UX-APPLE-5：a11y — .hailuo-focus、prefers-reduced-motion、touch-action:manipulation
+ * UX-APPLE-6：消息/群 — 会话行 / 气泡 / 输入区统一 token
+ * UX-AUDIT-9：全局 *:focus-visible 兜底（accent outline）；禁用态 cursor 由组件 class 补齐
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* UX-AUDIT-9：键盘焦点兜底；已挂 .hailuo-focus / focus-visible:ring-* 的控件仍用各自 ring */
+  *:focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.7);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  html {
+    color-scheme: light dark;
+    /* 略收紧字距 + 平滑渲染，接近系统 / iOS 观感 */
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  html:not(.dark) {
+    color-scheme: light;
+  }
+  body {
+    font-family: theme('fontFamily.sans');
+    font-size: 16px;
+    font-optical-sizing: auto;
+    letter-spacing: -0.011em;
+    line-height: 1.5;
+    /* 减少移动端双击缩放延迟，不影响捏合缩放 */
+    touch-action: manipulation;
+  }
+  /* 标题略再收紧；字重约 600（苹果感） */
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.022em;
+    font-weight: 600;
+  }
+  /* 等宽：代码/句柄旁用；仍优先系统 mono */
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: theme('fontFamily.mono');
+    letter-spacing: 0;
+  }
+
+  /* UX-APPLE-5：系统偏好减少动效时关掉非必要 transition / animation */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .hailuo-main-scroll {
+    scrollbar-gutter: stable;
+  }
+
+  /* UX-APPLE-5：键盘 focus-visible 统一环（鼠标点击不抢戏） */
+  .hailuo-focus {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/80 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950;
+  }
+
+  /* UX-MOBILE-FEED-CHAT-1：表单输入框 focus 环贴边（对齐记录页；无 ring-offset 空隙） */
+  .hailuo-focus-field {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/80 focus-visible:ring-offset-0 focus:border-sky-400 dark:focus:border-sky-500;
+  }
+
+  /* UX-UI-X-ALIGN：对齐 X 的结构线色（浅灰 #eff3f4 / 暗色 #2f3336），避免 zinc-500 过重 */
+  .hailuo-rule {
+    @apply border-[#eff3f4] dark:border-[#2f3336];
+  }
+  /* 表单等需要「看得见」的框：略深于结构线，仍远浅于 zinc-500 */
+  .hailuo-box {
+    @apply border border-zinc-300 dark:border-zinc-700;
+  }
+
+  /* UX-APPLE-6：会话列表 — 卡片间距（DM / 群共用） */
+  .hailuo-chat-list {
+    @apply min-h-0 flex-1 space-y-2 overflow-y-auto p-2.5;
+  }
+
+  /* UX-APPLE-6：会话行壳 + 选中左边条 */
+  .hailuo-chat-row {
+    @apply flex w-full items-start gap-3 rounded-2xl border border-l-4 px-3 py-2.5 text-left transition;
+  }
+  .hailuo-chat-row-idle {
+    @apply border-white/80 border-l-transparent bg-white/90 shadow-sm hover:-translate-y-px hover:border-sky-100 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900/80 dark:hover:border-zinc-600;
+  }
+  .hailuo-chat-row-selected {
+    @apply border-sky-300 border-l-sky-500 bg-gradient-to-r from-sky-200 via-sky-100 to-white shadow-md ring-1 ring-sky-200 dark:border-sky-700 dark:border-l-sky-400 dark:from-sky-500/30 dark:via-sky-500/10 dark:to-zinc-900 dark:ring-sky-800;
+  }
+
+  /* UX-APPLE-6：气泡 — 最大宽度 + 圆角（出/入方向） */
+  .hailuo-chat-bubble {
+    max-width: min(78%, 22rem);
+    @apply rounded-2xl px-3.5 py-2.5 text-sm shadow-md;
+  }
+  .hailuo-chat-bubble-out {
+    @apply rounded-br-md border border-sky-400/40 bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-sky-600/25;
+  }
+  .hailuo-chat-bubble-in {
+    @apply rounded-bl-md border border-white/80 bg-white/95 text-zinc-900 shadow-zinc-900/5 dark:border-zinc-600 dark:bg-zinc-800/95 dark:text-zinc-50 dark:shadow-black/30;
+  }
+
+  /* UX-APPLE-6：输入区 — 统一底栏 + 底部安全区（键盘/刘海） */
+  .hailuo-chat-composer {
+    @apply border-t border-zinc-200/80 bg-gradient-to-t from-zinc-100 to-white px-2 pt-2.5 shadow-[0_-4px_16px_rgba(15,23,42,0.04)] dark:border-zinc-700 dark:from-zinc-950 dark:to-zinc-900;
+    padding-bottom: max(0.625rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  /*
+   * UX-MOBILE-FEED-CHAT-1：手机主栏不再硬算 100vh。
+   * 旧写法 height: calc(100vh - 3.5rem) 在 Chrome 地址栏/底栏下会把滚动底伸进系统 UI，
+   * 「已加载全部内容」只剩半截；父级 body 已是 h-[100dvh] flex，主栏靠 flex-1 + min-h-0 即可。
+   * 底垫只留安全区 + 一小段，够末行完整露出（MobileBottomNav 已退役，勿再垫 3.5rem）。
+   */
+  @media (max-width: 767px) {
+    .hailuo-main-scroll {
+      height: auto;
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
+}

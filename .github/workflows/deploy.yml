@@ -1,0 +1,485 @@
+# M8-12/13 · 海螺节点一键部署（GitHub Actions · 进阶备用）
+#
+# 推荐路径请用 Cloudflare Workers Builds：docs/deploy-workers-builds.md
+# （Deploy command = npm run deploy:ci，不必配 GitHub Secrets）
+#
+# 站主 fork 本仓后若仍用本工作流：
+# 1. 在 GitHub → Settings → Secrets and variables → Actions 配置以下任一组合：
+#    A. **Scoped API Token（推荐）**：
+#       - CLOUDFLARE_API_TOKEN  （Edit Cloudflare Workers + D1 + KV + Pages + Workers Analytics Engine）
+#       - CLOUDFLARE_ACCOUNT_ID （可选；多账号场景消歧时手动设；省略则强制走 API /accounts 自动探测）
+#    B. **Global API Key（兼容，不推荐）**：
+#       - CLOUDFLARE_GLOBAL_API_KEY    （账户级根密钥）
+#       - CLOUDFLARE_EMAIL      （账号注册邮箱，与 Key 配对鉴权）
+#       - CLOUDFLARE_ACCOUNT_ID （可选；多账号场景消歧时手动设；省略则强制走 API /accounts 自动探测）
+#    可选：
+#       - WORKER_SECRETS_JSON — 若省略，首次自动生成；升级默认保留线上密钥
+#       - OTEL_ENABLED        — 设置为 "true" 即可自动激活 Workers Analytics Engine 指标收集（默认 "false"）
+#       - OWNER_SEED_USERNAME / OWNER_SEED_PASSWORD — 首次 seed 自定义站主账密（省略则 admin/admin；空表才写）
+#       - REGISTRY_URL — 覆盖默认注册中心
+# 2. Actions → 「Deploy hailuo node」→ Run workflow
+#
+# 部署流程（三段独立 job，UI 上清晰可见）：
+#   bootstrap → deploy-workers → deploy-pages
+#
+# M-WORKFLOW-ENV-1：Prepare 之后的 step **不要**再写
+#   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+# ——secret 未配时展开为空串，会盖掉 Prepare 写入 $GITHUB_ENV 的探测值，裸 wrangler → /memberships → 10000。
+#
+# 安全：
+# - Worker A URL 不写入 GITHUB_OUTPUT / 公开摘要
+# - .ci-deploy-state.json 含密钥，已 gitignore，仅作 job 间 artifact（私有）
+# - 本工作流只写站主自己的 Cloudflare 账号，不访问他人资源
+
+name: Deploy hailuo node
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hailuo-deploy-${{ github.repository }}
+  cancel-in-progress: false
+
+# ══════════════════════════════════════════════════════════════════
+# Job 1：Bootstrap — 创建 D1/KV + patch wrangler.toml + 生成密钥
+# ══════════════════════════════════════════════════════════════════
+jobs:
+  bootstrap:
+    name: 🔧 Bootstrap（D1 / KV / 密钥）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '20'
+        cache: npm
+
+    - name: Install (npm ci)
+      run: npm ci
+
+    # M-WORKFLOW-SDH-1：checkout 洁净仓 — KV/Pages 必须仍是占位（patch 前）
+    - name: Verify deploy config consistency (SDH-3 clean)
+      run: npm run test:deploy-config-consistency
+
+    - name: "Debug Cloudflare auth (modes + 3 probes)"
+      if: always()
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: |
+        # 调试 step：诊断 10000 错——token 复制不全 / EMAIL 配对错 / 账户 2FA / Account ID 错
+        # 不打任何 token / key 明文；只打 sha256 前 8 位 + 长度 + 错码
+        node scripts/ci-debug-cf-auth.mjs || echo "::warning::调试 step 失败——上方输出已能定位问题"
+
+    - name: Check Cloudflare credentials
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: |
+        if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -z "$CLOUDFLARE_GLOBAL_API_KEY" ]; then
+          echo "::error::请先在仓库 Settings → Secrets 配置 CLOUDFLARE_API_TOKEN（推荐 Scoped）或 CLOUDFLARE_GLOBAL_API_KEY + CLOUDFLARE_EMAIL（Global Key 模式）"
+          echo "::error::推荐改用 Workers Builds（见 docs/deploy-workers-builds.md），可免配 Secrets"
+          exit 1
+        fi
+        if [ -n "$CLOUDFLARE_GLOBAL_API_KEY" ] && [ -z "$CLOUDFLARE_EMAIL" ]; then
+          echo "::error::检测到 CLOUDFLARE_GLOBAL_API_KEY 但缺少 CLOUDFLARE_EMAIL（Global Key 模式必须配账号邮箱）"
+          exit 1
+        fi
+        echo "✓ Cloudflare 凭证已配置"
+
+    # Phase 1：创建 D1 / KV / R2，patch wrangler.toml（含 Workers 名字 + D1 ID + KV ID）
+    - name: Bootstrap resources + patch wrangler.toml
+      id: bootstrap
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        WORKER_SECRETS_JSON: ${{ secrets.WORKER_SECRETS_JSON }}
+        OTEL_ENABLED: ${{ vars.OTEL_ENABLED || secrets.OTEL_ENABLED }}
+      run: node scripts/ci-bootstrap-resources.mjs
+
+    # Secret 注入改到 deploy-workers：必须先有 Worker 脚本（secret put 不能对不存在的 Worker）
+
+    # Phase 3：创建 Pages 项目（仅建记录，不传文件；文件在 Phase 5）
+    - name: Ensure Pages project exists
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: |
+        STATE_FILE=scripts/.ci-deploy-state.json
+        PAGES_NAME=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).PAGES_PROJECT_NAME)")
+        PAGES_ID=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).pages_project_id||'')")
+        echo "Pages 项目名：$PAGES_NAME"
+        # bootstrap 阶段已幂等创建 Pages project；这里只确认状态（幂等，不重复调 API）
+        if [ -n "$PAGES_ID" ] && [ "$PAGES_ID" != "$PAGES_NAME" ]; then
+          echo "✓ Pages 项目已就绪（ID=$PAGES_ID）"
+        elif [ -n "$PAGES_ID" ]; then
+          echo "✓ Pages 项目已就绪（回退 name=$PAGES_NAME）"
+        else
+          echo "::error::bootstrap 未返回 pages_project_id，请检查上方日志"
+          exit 1
+        fi
+
+    # 上传 bootstrap 产物（含密钥的 state + 已回填的 wrangler.toml）
+    # 注意：
+    # 1) state 文件名以 `.` 开头 → upload-artifact@v4.4+ 默认排除隐藏文件，必须 include-hidden-files: true
+    # 2) 下游 job 是 fresh checkout，必须把 patched toml 一并传过去，否则仍是仓内 prod-placeholder
+    - name: Upload CI bootstrap artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-deploy-bootstrap
+        path: |
+          scripts/.ci-deploy-state.json
+          apps/worker-a/wrangler.toml
+          apps/worker-b/wrangler.toml
+        include-hidden-files: true
+        retention-days: 1
+        if-no-files-found: error
+
+# ══════════════════════════════════════════════════════════════════
+# Job 2：Deploy Workers — Migrations + Worker A + Worker B（含 URL 回填重部署）
+# ══════════════════════════════════════════════════════════════════
+  deploy-workers:
+    name: 🚀 Deploy Workers（A / B）
+    runs-on: ubuntu-latest
+    # 公开仓原则：任何用户用自己的 Token 首次部署都是「全新空账号」路径——
+    # 6 个空 D1 共 173 条 migration（DB_IMPORT 66 + IDENTITY 49 + GOVERNANCE 29 + CONTENT 8 + MESSAGING 19 + SHARD 2），
+    # 逐条 remote apply 比升级已有节点慢得多；20 分钟不够稳，放宽到 45 分钟（超时才代表真卡住）。
+    timeout-minutes: 45
+    needs: bootstrap
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '20'
+        cache: npm
+
+    - name: Install (npm ci)
+      run: npm ci
+
+    # 覆盖 checkout 里的占位 wrangler.toml + 恢复含密钥的 state
+    - name: Download CI bootstrap artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ci-deploy-bootstrap
+        path: .
+
+    - name: Verify patched wrangler.toml restored
+      run: |
+        # 注释里也会出现 prod-placeholder 字面，不能裸 grep；以 state 真 ID 是否已写入 toml 为准
+        node <<'EOF'
+        const fs = require('fs');
+        const statePath = 'scripts/.ci-deploy-state.json';
+        if (!fs.existsSync(statePath)) {
+          console.error('::error::缺少 ' + statePath + '（bootstrap artifact 未下载；检查 include-hidden-files）');
+          process.exit(1);
+        }
+        const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        const tomlA = fs.readFileSync('apps/worker-a/wrangler.toml', 'utf8');
+        const tomlB = fs.readFileSync('apps/worker-b/wrangler.toml', 'utf8');
+        const id = state.d1?.IDENTITY_DB;
+        const kv = state.kv?.STATE_KV;
+        if (!id || !kv) {
+          console.error('::error::state 缺少 d1.IDENTITY_DB 或 kv.STATE_KV');
+          process.exit(1);
+        }
+        if (!tomlA.includes(id)) {
+          console.error('::error::worker-a wrangler.toml 未含 IDENTITY_DB 真 ID——仍是 checkout 占位');
+          process.exit(1);
+        }
+        if (!tomlA.includes(kv) || !tomlB.includes(kv)) {
+          console.error('::error::A/B wrangler.toml 未含 STATE_KV 真 ID');
+          process.exit(1);
+        }
+        if (/^name\s*=\s*"hailuo-worker-a-prod-placeholder"\s*$/m.test(tomlA)) {
+          console.error('::error::worker-a 顶层 name 仍是 prod-placeholder');
+          process.exit(1);
+        }
+        if (!state.account_id) {
+          console.error('::error::state.account_id 为空——后续 wrangler 会打 /memberships 并 10000');
+          process.exit(1);
+        }
+        console.log('✓ state + patched wrangler.toml 已恢复（IDENTITY_DB / STATE_KV / name / account_id）');
+        EOF
+
+    # 关键：把 state.account_id 写回 env，避免 wrangler 缺 ACCOUNT_ID 时打 /memberships → 10000
+    - name: Prepare Cloudflare env (Account ID from state)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: node scripts/ci-prepare-cf-env.mjs
+
+    # Phase 4：D1 migrations（ACCOUNT_ID 继承 Prepare 写入的 $GITHUB_ENV，勿再塞空 secret）
+    - name: Apply D1 migrations
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: node scripts/ci-apply-migrations.mjs
+
+    # DEPLOY-SB-10143：空账号先 A 会 10143（Service Binding 指向尚不存在的 B）。
+    # 缺 B 时 stub 部署（临时去掉 B→A 绑定）；已存在则跳过。后续全量 B 步骤再补全互绑。
+    - name: Bootstrap Worker B peer (stub if missing)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: node scripts/bootstrap-worker-b-peer.mjs
+
+    # Phase 5：部署 Worker A（先 deploy 再 secret put / seed）
+    - name: Deploy Worker A
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: npm exec -- wrangler@3.114.17 deploy --env production --config apps/worker-a/wrangler.toml
+
+    # 对齐本地 deploy-hailuo-workers.ps1：A deploy 后立刻 seed 默认站主（空表才写；可用 OWNER_SEED_* 覆盖）
+    - name: Seed default owner credentials
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        OWNER_SEED_USERNAME: ${{ secrets.OWNER_SEED_USERNAME }}
+        OWNER_SEED_PASSWORD: ${{ secrets.OWNER_SEED_PASSWORD }}
+      run: node scripts/ci-seed-default-owner.mjs
+
+    # Phase 6：部署 Worker B（含 WORKER_A Service Binding；此时 A 已存在）
+    - name: Deploy Worker B
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: npm exec -- wrangler@3.114.17 deploy --env production --config apps/worker-b/wrangler.toml
+
+    # Phase 6b：Worker 已存在后再注入 JWT / Ed25519 / REGISTRY_URL 等 Secret
+    - name: Put Worker secrets
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+      run: node scripts/ci-put-secrets.mjs
+
+    # Phase 7：回填 WORKER_B_URL / WORKER_A_ORIGIN 到 toml vars（对齐本地 finalize；勿 secret put→10053）
+    - name: Finalize URL vars (toml)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: node scripts/ci-finalize-urls.mjs
+
+    # toml vars 变更后必须重部署，否则 Workers 运行时仍是占位 URL
+    - name: Redeploy Worker A (after URL vars)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: npm exec -- wrangler@3.114.17 deploy --env production --config apps/worker-a/wrangler.toml
+
+    - name: Redeploy Worker B (after URL vars)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: npm exec -- wrangler@3.114.17 deploy --env production --config apps/worker-b/wrangler.toml
+
+    # M-WORKFLOW-ED25519-1：硬校验登记三件套，避免升级/Retry 用占位公钥覆盖后假绿
+    - name: Verify register config (Ed25519 + WORKER_B_URL)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: node scripts/ci-verify-register-config.mjs
+
+    # M-WORKFLOW-SDH-1：finalize 后 toml 已是真 id → post-patch（A/B 对齐）；勿跑 clean 绝对占位
+    - name: Verify deploy config consistency (SDH-3 post-patch)
+      run: npm run test:deploy-config-consistency:post-patch
+
+    # Pages / Summary 需要 finalize 后的 urls.*；同名 artifact 跨 job 不可覆盖 → 另传 final
+    - name: Upload CI final artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-deploy-final
+        path: |
+          scripts/.ci-deploy-state.json
+          apps/worker-a/wrangler.toml
+          apps/worker-b/wrangler.toml
+        include-hidden-files: true
+        retention-days: 1
+        if-no-files-found: error
+
+# ══════════════════════════════════════════════════════════════════
+# Job 3：Deploy Pages — 构建 + 部署 Web 前端
+# ══════════════════════════════════════════════════════════════════
+  deploy-pages:
+    name: 🌐 Deploy Pages（Web 前端）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: deploy-workers
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '20'
+        cache: npm
+
+    - name: Install (npm ci)
+      run: npm ci
+
+    # 必须用 finalize 后的 state（含 urls.worker_b_url），不能再用 bootstrap 旧 artifact
+    - name: Download CI final artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ci-deploy-final
+        path: .
+
+    - name: Prepare Cloudflare env (Account ID from state)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: node scripts/ci-prepare-cf-env.mjs
+
+    # Phase 8：构建 Web（对齐本地：PUBLIC_WORKER_B_URL + PUBLIC_REGISTRY_URL）
+    - name: Build Web
+      env:
+        HAILUO_DEPLOY_STRICT: '1'
+        REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+      run: |
+        STATE_FILE=scripts/.ci-deploy-state.json
+        if [ ! -f "$STATE_FILE" ]; then
+          echo "::error::缺少 $STATE_FILE（ci-deploy-final artifact 未下载）"
+          exit 1
+        fi
+        WORKER_B_URL=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).urls?.worker_b_url||'')")
+        if [ -z "$WORKER_B_URL" ]; then
+          echo "::error::state.urls.worker_b_url 为空——finalize 未写入或下错了 bootstrap artifact"
+          exit 1
+        fi
+        # 与本地 Deploy-Pages 一致：构建期写入 deploy-env.json / Turnstile 桥基址
+        REGISTRY_FOR_BUILD=$(node -e "const s=JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')); console.log((process.env.REGISTRY_URL||s.REGISTRY_URL||'https://hailuo-registry.allovo.eu.org').trim().replace(/\\/+$/,''))")
+        echo "Worker B URL（注入前端构建）：$WORKER_B_URL"
+        echo "Registry URL（注入前端构建）：$REGISTRY_FOR_BUILD"
+        export PUBLIC_WORKER_B_URL="$WORKER_B_URL"
+        export PUBLIC_REGISTRY_URL="$REGISTRY_FOR_BUILD"
+        npm run build --workspace=web
+
+    # Phase 9：先 PATCH Production 绑定（对齐本地 finalize → 再 pages deploy）
+    # CF Pages 的 Service Binding / KV / secret 只作用于新部署；先 deploy 后 PATCH 会让本轮 Functions 缺 WORKER_A/STATE_KV
+    - name: Patch Pages env vars (before deploy)
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+      run: node scripts/ci-patch-pages-bindings.mjs
+
+    # Phase 10：部署 Pages（绑定已在上一步写好，本轮部署即带 Owner Gateway）
+    # ACCOUNT_ID 继承 Prepare 的 $GITHUB_ENV；勿再塞空 secret。Global Key 须在本 shell 桥成 API_KEY
+    # （子进程 Node 改 process.env / 写 $GITHUB_ENV 都改不了当前 bash）。
+    - name: Deploy Pages
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_GLOBAL_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
+        CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      run: |
+        STATE_FILE=scripts/.ci-deploy-state.json
+        PAGES_NAME=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).PAGES_PROJECT_NAME)")
+        ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}"
+        if [ -z "$ACCOUNT_ID" ]; then
+          ACCOUNT_ID=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).account_id||'')")
+        fi
+        if [ -z "$PAGES_NAME" ] || [ -z "$ACCOUNT_ID" ]; then
+          echo "::error::Pages 部署缺少 PAGES_PROJECT_NAME 或 ACCOUNT_ID"
+          exit 1
+        fi
+        # Global Key 模式：wrangler 只认 CLOUDFLARE_API_KEY（不认 GLOBAL_API_KEY）
+        if [ -n "$CLOUDFLARE_GLOBAL_API_KEY" ] && [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -z "$CLOUDFLARE_API_KEY" ]; then
+          export CLOUDFLARE_API_KEY="$CLOUDFLARE_GLOBAL_API_KEY"
+        fi
+        # 对齐本地 deploy-all.ps1：
+        # 1) pages deploy 不认 --account-id → 只走 CLOUDFLARE_ACCOUNT_ID env
+        # 2) 必须在 web/ 目录部署 dist（不能从仓库根 deploy web/dist）——否则同级 functions/ 不上传，
+        #    登录会报「无法连接节点 API 入口」（/auth/login-params 变 HTML）
+        export CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID"
+        echo "Pages 项目名：$PAGES_NAME，Account ID 已确认（走 env，不传 CLI flag）"
+        echo "cwd=web/ → pages deploy dist（确保 Uploading Functions bundle）"
+        cd web
+        npm exec -- wrangler@3.114.17 pages deploy dist \
+          --project-name "$PAGES_NAME" \
+          --branch main \
+          --commit-dirty=true \
+          --commit-message "hailuo-ci-deploy"
+
+# ══════════════════════════════════════════════════════════════════
+# Job 4：Summary — 汇总部署结果（无论成功失败都展示）
+# ══════════════════════════════════════════════════════════════════
+  summary:
+    name: ✅ 部署摘要
+    runs-on: ubuntu-latest
+  # 即使前面的 job 失败，Summary 仍执行（always 让 if: always() 生效）
+    if: always()
+    needs: [bootstrap, deploy-workers, deploy-pages]
+
+    steps:
+    # M-WORKFLOW-SUMMARY-2：必须先 checkout——artifact 只带 state/toml，不含 ci-write-deploy-summary.mjs
+    - name: Checkout (for summary script)
+      uses: actions/checkout@v5
+
+    # 优先 final（含 urls）；失败则回落 bootstrap（至少有 handle / 资源名）
+    # 不要用 hashFiles（无完整工作区时不可靠）；用脚本内 test -f
+    - name: Download CI final artifact (preferred)
+      continue-on-error: true
+      id: dl_final
+      uses: actions/download-artifact@v4
+      with:
+        name: ci-deploy-final
+        path: .
+
+    - name: Download CI bootstrap artifact (fallback)
+      if: ${{ steps.dl_final.outcome != 'success' }}
+      continue-on-error: true
+      uses: actions/download-artifact@v4
+      with:
+        name: ci-deploy-bootstrap
+        path: .
+
+    # 纯 Node 写摘要——禁止 bash 内嵌 node -e 带反引号（会 command not found）
+    - name: Generate summary
+      run: node scripts/ci-write-deploy-summary.mjs
+
+    # 持久化到 Actions Artifacts，站主点开 Web 后仍可回来下载（Summary 页在 Run 详情里也不丢）
+    - name: Upload deploy summary artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: hailuo-deploy-summary
+        path: scripts/ci-deploy-summary.md
+        retention-days: 30
+        if-no-files-found: ignore

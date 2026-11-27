@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { RegistryRegister } from '../components/RegistryRegister.tsx';
+---
+
+<!-- UX-CHAT-ALIGN-1：注册页用 main 铺满侧栏右侧（与消息/群聊同构），内容靠左贴菜单 -->
+<Layout title="注册到海螺注册中心" navActive="register" hideRightRail>
+  <RegistryRegister client:load />
+</Layout>

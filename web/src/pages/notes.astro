@@ -1,0 +1,12 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { PrivateNotes } from '../components/PrivateNotes.tsx';
+---
+
+<Layout
+  title="海螺节点 — 记录"
+  description="海螺节点 — 给自己发消息式私有记录"
+  navActive="notes"
+>
+  <PrivateNotes client:load />
+</Layout>

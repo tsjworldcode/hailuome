@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@hailuo/shared-types": ["./packages/shared-types/src/index.ts"],
+      "@hailuo/shared-utils": ["./packages/shared-utils/src/index.ts"],
+      "@hailuo/shared-crypto": ["./packages/shared-crypto/src/index.ts"],
+      "@hailuo/shared-crypto/ed25519": ["./packages/shared-crypto/src/ed25519.ts"],
+      "@hailuo/shared-crypto/jwt": ["./packages/shared-crypto/src/jwt.ts"],
+      "@hailuo/shared-crypto/hmac": ["./packages/shared-crypto/src/hmac.ts"],
+      "@hailuo/registry-protocol": ["./packages/registry-protocol/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,18 @@
+---
+// M7-4：本人主页
+// - 整页只挂一个 Preact island（client:load）；frontmatter 不做任何 fetch
+//   （JWT / Worker A 地址全部走客户端运行时，避免 SSG 阶段把任何凭证或 URL 落进静态产物）
+// - §F-02：本文件不引用任何 Worker A 字面量；Profile 组件内部用 auth.ts.getWorkerAUrl 运行时读取
+import Layout from '../layouts/Layout.astro';
+import { Profile } from '../components/Profile.tsx';
+---
+
+<Layout
+  title="海螺节点 — 个人主页"
+  description="海螺节点 — 本人帖子列表与管理"
+  navActive="profile"
+>
+  <div class="w-full px-4 py-6 sm:px-6 sm:py-8">
+    <Profile client:load />
+  </div>
+</Layout>

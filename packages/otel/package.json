@@ -1,0 +1,9 @@
+{
+  "name": "@hailuo/otel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenTelemetry 轻量 API-only 包装（Cloudflare Workers 原生 `ctx.tracing` + Analytics Engine）；0 第三方 SDK 依赖。详见 docs/observability-plan.md",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

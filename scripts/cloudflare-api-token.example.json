@@ -1,0 +1,55 @@
+{
+  "CLOUDFLARE_ACCOUNT_ID": "<Cloudflare 控制台右上角 Account ID>",
+  "CLOUDFLARE_API_TOKEN": "<API Token：Workers + D1 + KV + Pages 编辑权限>",
+
+  "BOOTSTRAP_HANDLE": "",
+
+  "_comment_bootstrap_handle": "BOOTSTRAP_HANDLE=部署占位 handle（自动生成 hailuo_+10 位；手填示例用 usr_alice_placeholder，禁止真实人名）；登记后以 D1 users.handle 为准，≠ 站主登录名 OWNER_LOGIN_USERNAME",
+  "_comment_identity": "留空则 deploy 自动生成 — BOOTSTRAP_HANDLE=hailuo_+10位；DEPLOY_GROUP_CODE=6位；A/B/Pages 各 32 位 hex（WORKER_A_RESOURCE_ID 等）；项目名 hailuo-worker-a|b|web-{同组码}-{资源ID前28位}",
+  "_comment_legacy_owner_handle": "旧 token 可保留 OWNER_HANDLE 键名，bootstrap 会自动回落读取并写回 BOOTSTRAP_HANDLE",
+  "WORKER_A_RESOURCE_ID": "",
+  "WORKER_B_RESOURCE_ID": "",
+  "PAGES_RESOURCE_ID": "",
+  "_comment_legacy_resource_id": "旧版单 UUID 部署可保留 DEPLOY_RESOURCE_ID + 已填 WORKER_*_NAME；bootstrap 不会覆盖",
+  "DEPLOY_RESOURCE_ID": "",
+  "WORKER_A_NAME": "",
+  "WORKER_B_NAME": "",
+  "PAGES_PROJECT_NAME": "",
+  "OWNER_LOGIN_USERNAME": "",
+  "OWNER_LOGIN_PASSWORD": "",
+
+  "_comment_secrets": "以下 Secret 可留空，运行 deploy-all.ps1 时会自动生成并写回本文件",
+  "JWT_SECRET": "",
+  "INTERNAL_FORWARD_SECRET": "",
+  "TOTP_WRAP_SECRET": "",
+  "NODE_API_TOKEN_WRAP_SECRET": "",
+  "GROUP_OWNER_KEY_WRAP_SECRET": "",
+  "ED25519_PUBLIC_KEY": "",
+  "ED25519_PRIVATE_KEY": "",
+  "HMAC_SECRET": "",
+  "MEDIA_TICKET_SECRET": "",
+  "_comment_media_ticket": "SEC-6-SECRET：仅 Worker B 媒体票据 HMAC；可留空由部署脚本生成；线上已有则跳过不覆盖；禁止复用 JWT/INTERNAL_FORWARD 等",
+  "_comment_totp_wrap": "M12-1：包裹站主二次验证密钥；≥16 字节；缺了则设置页开启二次验证会报「服务暂时不可用」",
+  "_comment_node_api_token_wrap": "R-MSG-1d：包裹登记凭证；缺了则设置页可能「读取登记资料失败」",
+  "_comment_group_owner_key_wrap": "OWNER-KEY：包裹群主持钥表 key_material；≥32 字节；仅 Worker A；禁止与 JWT/HMAC/TOTP/nat_ wrap 复用",
+
+  "_comment_hosts": "首次可留空；部署完成后 finalize 写回真实 URL（形态见 docs/部署指南.md §1.4）",
+  "WORKER_B_HOST": "",
+  "WORKER_A_HOST": "",
+  "PAGES_URL": "",
+
+  "_comment_pages": "M9-23 起 deploy-all.ps1 始终部署 Pages（Owner Gateway）；无需 PAGES_DEPLOY 开关",
+  "PAGES_BRANCH": "main",
+
+  "REGISTRY_URL": "https://hailuo-registry.allovo.eu.org",
+
+  "_comment_registry": "REGISTRY_URL 经 bootstrap secret put 写入 Worker A/B；finalize 以 secret_text 写入 Pages PUBLIC_REGISTRY_URL（控制台不可见明文）",
+  "_comment_turnstile": "海螺注册中心 Turnstile Site Key（与 REGISTRY_URL 配套；finalize 会写入 Pages Production）",
+  "PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAADMYb_bOx7zeI9EI",
+
+  "_comment_proxy": "可选：Mac/Linux 或不想用系统代理时填写，如 http://127.0.0.1:7890；留空则 Windows 自动读系统代理、其它平台直连",
+  "HTTP_PROXY": "",
+
+  "_comment_usage": "本地部署：复制为 cloudflare-api-token.json，至少填 CLOUDFLARE_API_TOKEN；CLOUDFLARE_ACCOUNT_ID 可留空（deploy-all/bootstrap 会调 GET /accounts 自动探测并写回，与 GitHub CI 同源；多账号时请手填消歧）；handle/登录名/资源名/密钥/URL 由脚本自动生成",
+  "_comment_github": "另一条路是 README 的 Deploy 按钮（需要 GitHub fork），与本文件无关"
+}

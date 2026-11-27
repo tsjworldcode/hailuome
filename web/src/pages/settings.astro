@@ -1,0 +1,46 @@
+---
+// M7-5 雏型：设置页（仅 Worker A 私密地址 + JWT 登录两项最小闭环）
+// - 整页只挂一个 Preact island（client:load）；frontmatter 不做任何 fetch
+//   （所有读写都在客户端走 localStorage / sessionStorage，避免 SSG 阶段把任何凭证落进静态产物）
+// - §F-02：本文件不引用任何 Worker A 字面量；Settings 组件内部用 auth.ts.getWorkerAUrl 运行时读取
+// - M7-26h-fix2：lockMainScroll + flex 高度链，左栏钉住、只滚右侧正文（不再依赖 absolute/sticky）
+import Layout from '../layouts/Layout.astro';
+import { Settings } from '../components/Settings.tsx';
+---
+
+<Layout
+  title="海螺节点 — 设置"
+  description="海螺节点 — 站主设置：节点私密地址与登录"
+  navActive="settings"
+  lockMainScroll={true}
+>
+  <div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+    <header class="shrink-0 border-b border-[#eff3f4] bg-white/90 px-4 py-3 backdrop-blur-md dark:border-[#2f3336] dark:bg-black/90 sm:px-6">
+      <h1 class="text-xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50" data-i18n="settingsPageTitle">设置</h1>
+      <p class="mt-0.5 text-[13px] text-zinc-500 dark:text-zinc-400" data-i18n="settingsPageDescription">
+        管理外观主题、站主账号与本地数据。节点写层地址在部署时已自动绑定。
+      </p>
+    </header>
+
+    {/*
+      settings-panel 必须自己占满剩余高度。
+      client:only 外包的 astro-island 默认按内容撑开，不补 min-height:0 / flex:1
+      的话右栏 overflow 没有边界，左栏会跟着 main（或整页）一起滚。
+    */}
+    <div class="settings-panel flex min-h-0 flex-1 flex-col overflow-hidden px-4 sm:px-6">
+      <Settings client:only="preact" />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .settings-panel,
+  .settings-panel :global(astro-island) {
+    display: flex;
+    flex: 1 1 0%;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    height: 100%;
+  }
+</style>

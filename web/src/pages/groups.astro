@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { GroupsChat } from '../components/GroupsChat.tsx';
+---
+
+<Layout
+  title="海螺节点 — 群聊"
+  description="海螺节点 — 多人加密群聊"
+  navActive="groups"
+  hideRightRail
+>
+  <GroupsChat client:load />
+</Layout>

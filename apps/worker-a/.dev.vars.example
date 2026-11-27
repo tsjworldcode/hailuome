@@ -1,0 +1,59 @@
+# Worker A 本地 / Deploy 向导 Secret 示例
+# 复制为同目录 .dev.vars（已被 .gitignore），勿提交 git。
+#
+# 占位示例，禁止使用真实人名/手柄（12-anti-deanonymization always-on）。
+# 部署占位 handle 写在 wrangler.toml [vars].BOOTSTRAP_HANDLE，推荐：
+#   BOOTSTRAP_HANDLE=usr_alice_placeholder
+# （登记注册中心后以外 D1 users.handle 为准；≠ 站主登录名）
+#
+# Deploy to Cloudflare 向导会读取 package.json → cloudflare.bindings 各字段说明。
+# 生产部署步骤：docs/部署指南.md §3～§6
+
+# F-11 / F-17: 本地联调 CORS（F-17 优先于 WORKER_A_ORIGIN）
+# 生产 WORKER_A_ORIGIN 由 ci-finalize-urls.mjs → wrangler secret put 注入，勿写进 wrangler.toml
+WORKER_A_DEV_ORIGIN=http://localhost:4321
+# 可选：未设 DEV_ORIGIN 时的 CORS 回落（与 Pages 本地预览同端口即可）
+# WORKER_A_ORIGIN=http://localhost:4321
+
+# F-04: Worker B 本地地址（dev 必需；生产由 ci-finalize-urls.mjs 注入）
+WORKER_B_URL=http://127.0.0.1:8788
+
+# 本地注册中心 wrangler dev 默认 8789；生产经 wrangler secret put REGISTRY_URL 注入
+# REGISTRY_URL=https://hailuo-registry.allovo.eu.org
+
+# M9-PH-BI-1：可选覆盖入口地址（逗号分隔 https）。不设则用源码钉死表。
+# 设了环境变量后，源码里的地址不会再生效。
+# BOOTSTRAP_URL_CANDIDATES=https://bootstrap.example.com/.well-known/hailuo-bootstrap.json
+
+# ── Deploy 向导 / 首次生产建议填写的 Secret ─────────────────────────────
+# 生成随机串：node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_SECRET=dev-jwt-secret-change-me
+INTERNAL_FORWARD_SECRET=dev-internal-forward-secret-change-me
+TOTP_WRAP_SECRET=dev-totp-wrap-secret-change-me-32bytes-min
+# R-MSG-1d：包裹注册中心 nat_（与 TOTP_WRAP_SECRET 独立；本地可另填随机 ≥16 字节）
+NODE_API_TOKEN_WRAP_SECRET=dev-node-api-token-wrap-secret-change-me-32b
+# OWNER-KEY-1：包裹群主持钥表 key_material（与上列全部独立；≥32 字节随机 hex）
+GROUP_OWNER_KEY_WRAP_SECRET=dev-group-owner-key-wrap-secret-change-me-32b
+
+# 粉丝 Token 私钥（hex）。仓库根：npm run keys:generate → 公钥写入 wrangler vars
+ED25519_PRIVATE_KEY=PLACEHOLDER
+
+# 与注册中心联调时再配（≥32 字节，与 operator 注入一致）
+HMAC_SECRET=dev-hmac-secret-change-me
+
+# ── M5-B2：Backblaze B2（可选，初次部署可跳过）────────────────────────
+# B2_KEY_ID=...
+# B2_APP_KEY=...
+# B2_BUCKET_NAME=hailuo-images
+# B2_ENDPOINT=https://s3.us-west-004.backblazeb2.com
+# B2_PUBLIC_URL=https://f004.backblazeb2.com/file/hailuo-images
+
+# ── M5-SR-P2c：R2 CF /usage API 校准（可选；未配时回落 IMAGE_R2.list）────────
+# R2_USAGE_ACCOUNT_ID=your-cloudflare-account-id
+# R2_USAGE_BUCKET_NAME=hailuo-images-r2
+# R2_USAGE_API_TOKEN=...   # wrangler secret put R2_USAGE_API_TOKEN（R2 Read 权限）
+
+# ── SPILL-2-5：本地旧 wrangler 仅有 env.DB、缺 IDENTITY/GOVERNANCE/CONTENT 时 ──
+# 仅本地开发用。设 true 时 bindings resolver 可回落 env.DB 并 console.warn。
+# **生产严禁设置**（A7-DB-RETIRE 后 wrangler 已无 binding=DB）。
+# HAILUO_DEV_DB_FALLBACK=true

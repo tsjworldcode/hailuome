@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { RegistryCertify } from '../components/RegistryCertify.tsx';
+---
+
+<!-- UX-CHAT-ALIGN-1：认证页用 main 铺满侧栏右侧（与消息/群聊同构），内容靠左贴菜单 -->
+<Layout title="节点认证" navActive="certify" hideRightRail>
+  <RegistryCertify client:load />
+</Layout>

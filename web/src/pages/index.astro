@@ -1,0 +1,10 @@
+---
+// M7-2：Timeline 主页（首页）
+// M7-22：移除「海螺节点 / Feed」标题栏，时间线顶栏仅保留 Tabs
+import Layout from '../layouts/Layout.astro';
+import { Timeline } from '../components/Timeline.tsx';
+---
+
+<Layout title="首页" navActive="home">
+  <Timeline client:load />
+</Layout>
